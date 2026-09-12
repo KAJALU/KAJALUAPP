@@ -173,6 +173,7 @@ export default function App() {
   const [pautas, setPautas] = useState(seedPautas);
   const [perfilesIA, setPerfilesIA] = useState([]);
   const [sugerenciasIA, setSugerenciasIA] = useState([]);
+  const [promosPendientes, setPromosPendientes] = useState([]);
 
   const [loaded, setLoaded] = useState(false);
   const [saveError, setSaveError] = useState(false);
@@ -206,6 +207,7 @@ export default function App() {
           if (data.pautas) setPautas(data.pautas);
           if (data.perfilesIA) setPerfilesIA(data.perfilesIA);
           if (data.sugerenciasIA) setSugerenciasIA(data.sugerenciasIA);
+          if (data.promosPendientes) setPromosPendientes(data.promosPendientes);
         }
       } catch (e) {
         // Aún no hay datos guardados: se usan los datos de ejemplo
@@ -219,12 +221,12 @@ export default function App() {
   // Guardar automáticamente en Supabase cada vez que algo cambia
   useEffect(() => {
     if (!loaded) return;
-    const data = { clientes, citas, productos, compras, gastos, ventas, tareas, notas, recordatorios, tips, plantillas, servicios, resenas, pautas, perfilesIA, sugerenciasIA };
+    const data = { clientes, citas, productos, compras, gastos, ventas, tareas, notas, recordatorios, tips, plantillas, servicios, resenas, pautas, perfilesIA, sugerenciasIA, promosPendientes };
     supabase
       .from("app_data")
       .upsert({ id: "main", data, updated_at: new Date().toISOString() })
       .then(({ error }) => setSaveError(!!error));
-  }, [loaded, clientes, citas, productos, compras, gastos, ventas, tareas, notas, recordatorios, tips, plantillas, servicios, resenas, pautas, perfilesIA, sugerenciasIA]);
+  }, [loaded, clientes, citas, productos, compras, gastos, ventas, tareas, notas, recordatorios, tips, plantillas, servicios, resenas, pautas, perfilesIA, sugerenciasIA, promosPendientes]);
 
   const tabs = [
     { id: "inicio", label: "Inicio", icon: <Home size={18} /> },
@@ -364,6 +366,11 @@ export default function App() {
           color: var(--accent);
           padding: 4px 10px 20px;
         }
+        .k-logo-wrap { display: flex; justify-content: center; padding: 6px 0 20px; }
+        .k-logo-img {
+          width: 96px; height: 96px; border-radius: 50%; object-fit: cover;
+          box-shadow: 0 2px 10px rgba(0,0,0,0.18);
+        }
         .k-nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
         .k-navitem {
           display: flex; align-items: center; gap: 10px;
@@ -487,7 +494,9 @@ export default function App() {
       `}</style>
 
       <aside className="k-sidebar">
-        <div className="k-logo">Kajalu</div>
+        <div className="k-logo-wrap">
+          <img src="/logo.jpg" alt="Kajalu Stetic" className="k-logo-img" />
+        </div>
         <nav className="k-nav">
           {tabs.map((t) => (
             <button
@@ -516,7 +525,7 @@ export default function App() {
               setTareas(seedTareas); setNotas(seedNotas); setRecordatorios(seedRecordatorios);
               setTips(seedTips); setPlantillas(seedPlantillas);
               setServicios(seedServicios); setResenas(seedResenas); setPautas(seedPautas);
-              setPerfilesIA([]); setSugerenciasIA([]);
+              setPerfilesIA([]); setSugerenciasIA([]); setPromosPendientes([]);
             }}
           >
             Restablecer datos
@@ -583,6 +592,11 @@ export default function App() {
             setSugerenciasIA={setSugerenciasIA}
             setTareas={setTareas}
             setRecordatorios={setRecordatorios}
+            servicios={servicios}
+            setTips={setTips}
+            setPautas={setPautas}
+            promosPendientes={promosPendientes}
+            setPromosPendientes={setPromosPendientes}
           />
         )}
       </main>
@@ -1202,6 +1216,9 @@ function Servicios({ servicios, setServicios }) {
     <div>
       <SectionHeader icon={<Tag size={18} />} title="Servicios y precios ofrecidos" subtitle="El menú de servicios que le muestras a tus clientas." />
       <Card>
+        <img src="/folleto-servicios.jpg" alt="Folleto de servicios Kajalu Stetic" style={{ width: "100%", maxWidth: 340, display: "block", margin: "0 auto", borderRadius: 12 }} />
+      </Card>
+      <Card>
         <h3>Agregar servicio</h3>
         <div className="k-form">
           <input placeholder="Nombre del servicio" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} />
@@ -1337,9 +1354,15 @@ function Pautas({ pautas, setPautas }) {
 }
 
 // ---------- Asistente IA (fidelización y gestión autónoma de tareas) ----------
-function AsistenteIA({ clientes, citas, resenas, perfilesIA, setPerfilesIA, sugerenciasIA, setSugerenciasIA, setTareas, setRecordatorios }) {
+function AsistenteIA({ clientes, citas, resenas, perfilesIA, setPerfilesIA, sugerenciasIA, setSugerenciasIA, setTareas, setRecordatorios, servicios, setTips, setPautas, promosPendientes, setPromosPendientes }) {
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState("");
+  const [cargandoTips, setCargandoTips] = useState(false);
+  const [errorTips, setErrorTips] = useState("");
+  const [cargandoPromos, setCargandoPromos] = useState(false);
+  const [errorPromos, setErrorPromos] = useState("");
+  const [ultimosTips, setUltimosTips] = useState([]);
+  const [ultimasPromos, setUltimasPromos] = useState([]);
 
   const construirResumenClientes = () => {
     return clientes.map((c) => {
@@ -1402,6 +1425,71 @@ ${resumen}`;
     }
   };
 
+  const generarTips = async () => {
+    setCargandoTips(true); setErrorTips(""); setUltimosTips([]);
+    try {
+      const listaServicios = servicios.map((s) => s.nombre).join(", ") || "servicios de belleza en general";
+      const prompt = `Eres el creador de contenido de Kajalu Stetic, un centro de belleza. Sus servicios son: ${listaServicios}.
+Genera 4 tips de belleza breves, prácticos y originales, relacionados con esos servicios, listos para publicar.
+Responde ÚNICAMENTE con un JSON válido (sin texto adicional, sin backticks) con esta forma exacta:
+{"tips":[{"titulo":"...","texto":"...","categoria":"..."}]}`;
+
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 1000, messages: [{ role: "user", content: prompt }] }),
+      });
+      const data = await response.json();
+      const textBlock = (data.content || []).map((b) => b.text || "").join("\n");
+      const parsed = JSON.parse(textBlock.replace(/```json|```/g, "").trim());
+      const nuevos = (parsed.tips || []).map((t) => ({ id: uid(), ...t }));
+      setTips((prev) => [...nuevos, ...prev]);
+      setUltimosTips(nuevos);
+    } catch (e) {
+      setErrorTips("No se pudieron generar los tips. Intenta de nuevo.");
+    } finally {
+      setCargandoTips(false);
+    }
+  };
+
+  const generarPromociones = async () => {
+    setCargandoPromos(true); setErrorPromos(""); setUltimasPromos([]);
+    try {
+      const listaServicios = servicios.map((s) => `${s.nombre} (${s.categoria}${s.precio ? `, ${money(s.precio)}` : ""})`).join("; ") || "sin servicios registrados aún";
+      const prompt = `Eres el estratega de marketing de Kajalu Stetic, un centro de belleza. Estos son sus servicios y precios:
+${listaServicios}
+
+Diseña 3 promociones rentables (combos o descuentos pensados para aumentar el ticket promedio o llenar horarios flojos, no solo bajar precios). Cada una debe combinar servicios reales de la lista cuando sea posible.
+Responde ÚNICAMENTE con un JSON válido (sin texto adicional, sin backticks) con esta forma exacta:
+{"promos":[{"titulo":"...","categoria":"...","texto":"..."}]}`;
+
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 1000, messages: [{ role: "user", content: prompt }] }),
+      });
+      const data = await response.json();
+      const textBlock = (data.content || []).map((b) => b.text || "").join("\n");
+      const parsed = JSON.parse(textBlock.replace(/```json|```/g, "").trim());
+      const nuevas = (parsed.promos || []).map((p) => ({ id: uid(), titulo: p.titulo, categoria: p.categoria, texto: p.texto }));
+      setPromosPendientes((prev) => [...nuevas, ...prev]);
+      setUltimasPromos(nuevas);
+    } catch (e) {
+      setErrorPromos("No se pudieron generar las promociones. Intenta de nuevo.");
+    } finally {
+      setCargandoPromos(false);
+    }
+  };
+
+  const aprobarPromo = (p) => {
+    setPautas((ps) => [...ps, { id: uid(), titulo: p.titulo, categoria: p.categoria, texto: p.texto }]);
+    setPromosPendientes((pp) => pp.filter((x) => x.id !== p.id));
+  };
+
+  const descartarPromo = (id) => {
+    setPromosPendientes((pp) => pp.filter((x) => x.id !== id));
+  };
+
   const aplicarSugerencia = (s) => {
     if (s.tipo === "tarea") {
       setTareas((ts) => [...ts, { id: uid(), texto: `${s.texto} (${s.cliente})`, hecha: false }]);
@@ -1432,6 +1520,57 @@ ${resumen}`;
           </button>
         </div>
         {error && <p style={{ color: "var(--danger)", fontSize: 13, marginTop: 10, marginBottom: 0 }}>{error}</p>}
+      </Card>
+
+      <div className="k-grid cols-2">
+        <Card>
+          <h3>Tips de belleza con IA</h3>
+          <p style={{ margin: "0 0 12px", fontSize: 13.5, color: "var(--ink-soft)" }}>
+            Genera tips listos para publicar, basados en tus servicios reales.
+          </p>
+          <button className="k-btn" onClick={generarTips} disabled={cargandoTips}>
+            {cargandoTips ? <Loader2 size={14} className="k-spin" /> : <Sparkles size={14} />}
+            {cargandoTips ? "Generando…" : "Generar tips"}
+          </button>
+          {errorTips && <p style={{ color: "var(--danger)", fontSize: 13, marginTop: 10 }}>{errorTips}</p>}
+          {ultimosTips.length > 0 && (
+            <p style={{ color: "var(--success)", fontSize: 12.5, marginTop: 10, marginBottom: 0 }}>
+              Se agregaron {ultimosTips.length} tips nuevos a la sección "Tips de belleza".
+            </p>
+          )}
+        </Card>
+
+        <Card>
+          <h3>Promociones rentables con IA</h3>
+          <p style={{ margin: "0 0 12px", fontSize: 13.5, color: "var(--ink-soft)" }}>
+            Diseña combos y descuentos pensados para subir tus ventas, no solo bajar precios.
+          </p>
+          <button className="k-btn" onClick={generarPromociones} disabled={cargandoPromos}>
+            {cargandoPromos ? <Loader2 size={14} className="k-spin" /> : <Megaphone size={14} />}
+            {cargandoPromos ? "Generando…" : "Generar promociones"}
+          </button>
+          {errorPromos && <p style={{ color: "var(--danger)", fontSize: 13, marginTop: 10 }}>{errorPromos}</p>}
+          {ultimasPromos.length > 0 && (
+            <p style={{ color: "var(--success)", fontSize: 12.5, marginTop: 10, marginBottom: 0 }}>
+              Se generaron {ultimasPromos.length} promociones — revísalas abajo antes de publicarlas.
+            </p>
+          )}
+        </Card>
+      </div>
+
+      <Card>
+        <h3>Promociones pendientes de tu aprobación</h3>
+        {promosPendientes.length === 0 && <EmptyState text="No hay promociones esperando revisión." />}
+        {promosPendientes.map((p) => (
+          <div className="k-list-row" key={p.id}>
+            <div className="main">
+              <div className="title">{p.titulo}</div>
+              <div className="sub">{p.categoria} · {p.texto}</div>
+            </div>
+            <button className="k-btn" style={{ fontSize: 12, padding: "6px 10px" }} onClick={() => aprobarPromo(p)}>Aprobar</button>
+            <IconBtn danger onClick={() => descartarPromo(p.id)} title="Descartar"><Trash2 size={14} /></IconBtn>
+          </div>
+        ))}
       </Card>
 
       <div className="k-grid cols-2">
