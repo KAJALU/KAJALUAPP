@@ -94,13 +94,24 @@ const seedPlantillas = [
 ];
 
 const seedServicios = [
-  { id: uid(), nombre: "Masaje reductor", categoria: "Masajes", precio: 85000, duracion: "50 min" },
-  { id: uid(), nombre: "Masaje relajante", categoria: "Masajes", precio: 70000, duracion: "45 min" },
-  { id: uid(), nombre: "Manicure clásica", categoria: "Uñas", precio: 35000, duracion: "40 min" },
-  { id: uid(), nombre: "Manicure semipermanente", categoria: "Uñas", precio: 45000, duracion: "50 min" },
-  { id: uid(), nombre: "Pedicure spa", categoria: "Uñas", precio: 55000, duracion: "60 min" },
-  { id: uid(), nombre: "Corte + tratamiento capilar", categoria: "Cabello", precio: 90000, duracion: "70 min" },
-  { id: uid(), nombre: "Maquillaje social", categoria: "Maquillaje", precio: 120000, duracion: "60 min" },
+  { id: uid(), nombre: "Blower y planchado", categoria: "Cabello", precio: 0, duracion: "" },
+  { id: uid(), nombre: "Tintes", categoria: "Cabello", precio: 0, duracion: "" },
+  { id: uid(), nombre: "Keratina", categoria: "Cabello", precio: 0, duracion: "" },
+  { id: uid(), nombre: "Aminoácidos", categoria: "Cabello", precio: 0, duracion: "" },
+  { id: uid(), nombre: "Hidratación capilar", categoria: "Cabello", precio: 0, duracion: "" },
+  { id: uid(), nombre: "Cubrimiento de canas", categoria: "Cabello", precio: 0, duracion: "" },
+  { id: uid(), nombre: "Pedicure y manicure tradicional", categoria: "Uñas", precio: 0, duracion: "" },
+  { id: uid(), nombre: "Semipermanente en uña natural", categoria: "Uñas", precio: 0, duracion: "" },
+  { id: uid(), nombre: "Press on", categoria: "Uñas", precio: 0, duracion: "" },
+  { id: uid(), nombre: "Despigmentación de zonas oscuras", categoria: "Rostro", precio: 0, duracion: "" },
+  { id: uid(), nombre: "Limpieza facial total", categoria: "Rostro", precio: 0, duracion: "" },
+  { id: uid(), nombre: "Alta frecuencia facial y capilar", categoria: "Rostro", precio: 0, duracion: "" },
+  { id: uid(), nombre: "Depilación con cera", categoria: "Cuerpo", precio: 0, duracion: "" },
+  { id: uid(), nombre: "Masaje relajante completo", categoria: "Masajes", precio: 0, duracion: "" },
+  { id: uid(), nombre: "Masaje descontracturante", categoria: "Masajes", precio: 0, duracion: "" },
+  { id: uid(), nombre: "Drenajes linfáticos", categoria: "Masajes", precio: 0, duracion: "" },
+  { id: uid(), nombre: "Post operatorios manuales", categoria: "Masajes", precio: 0, duracion: "" },
+  { id: uid(), nombre: "Masajes reductores (manta térmica, maderoterapia, gimnasia pasiva)", categoria: "Masajes", precio: 0, duracion: "" },
 ];
 
 const seedResenas = [
@@ -526,7 +537,7 @@ export default function App() {
           />
         )}
         {activeTab === "citas" && (
-          <Citas citas={citas} setCitas={setCitas} clientes={clientes} cycleEstadoCita={cycleEstadoCita} />
+          <Citas citas={citas} setCitas={setCitas} clientes={clientes} cycleEstadoCita={cycleEstadoCita} servicios={servicios} />
         )}
         {activeTab === "clientes" && <Clientes clientes={clientes} setClientes={setClientes} citas={citas} />}
         {activeTab === "servicios" && <Servicios servicios={servicios} setServicios={setServicios} />}
@@ -676,13 +687,26 @@ function Inicio({ citasHoy, stockBajo, ofertasProximas, totalIngresosMes, totalG
 }
 
 // ---------- Citas ----------
-function Citas({ citas, setCitas, clientes, cycleEstadoCita }) {
+function Citas({ citas, setCitas, clientes, cycleEstadoCita, servicios }) {
   const [form, setForm] = useState({ cliente: "", servicio: "", fecha: todayISO, hora: "10:00", precio: "" });
+  const [servicioOtro, setServicioOtro] = useState("");
+  const esOtro = form.servicio === "__otro__";
 
   const addCita = () => {
-    if (!form.cliente.trim() || !form.servicio.trim()) return;
-    setCitas((cs) => [...cs, { id: uid(), ...form, precio: Number(form.precio) || 0, estado: "pendiente" }]);
+    const servicioFinal = esOtro ? servicioOtro.trim() : form.servicio.trim();
+    if (!form.cliente.trim() || !servicioFinal) return;
+    setCitas((cs) => [...cs, { ...form, servicio: servicioFinal, id: uid(), precio: Number(form.precio) || 0, estado: "pendiente" }]);
     setForm({ cliente: "", servicio: "", fecha: todayISO, hora: "10:00", precio: "" });
+    setServicioOtro("");
+  };
+
+  const elegirServicio = (valor) => {
+    if (valor === "__otro__") {
+      setForm({ ...form, servicio: valor });
+      return;
+    }
+    const match = servicios.find((s) => s.nombre === valor);
+    setForm({ ...form, servicio: valor, precio: match ? match.precio : form.precio });
   };
 
   const ordenadas = [...citas].sort((a, b) => (a.fecha + a.hora).localeCompare(b.fecha + b.hora));
@@ -697,7 +721,14 @@ function Citas({ citas, setCitas, clientes, cycleEstadoCita }) {
           <datalist id="clientes-lista">
             {clientes.map((c) => <option key={c.id} value={c.nombre} />)}
           </datalist>
-          <input placeholder="Servicio" value={form.servicio} onChange={(e) => setForm({ ...form, servicio: e.target.value })} />
+          <select value={form.servicio} onChange={(e) => elegirServicio(e.target.value)}>
+            <option value="" disabled>Selecciona un servicio</option>
+            {servicios.map((s) => <option key={s.id} value={s.nombre}>{s.nombre}</option>)}
+            <option value="__otro__">Otro (especificar)</option>
+          </select>
+          {esOtro && (
+            <input placeholder="Escribe el servicio" value={servicioOtro} onChange={(e) => setServicioOtro(e.target.value)} />
+          )}
           <input type="date" value={form.fecha} onChange={(e) => setForm({ ...form, fecha: e.target.value })} />
           <input type="time" value={form.hora} onChange={(e) => setForm({ ...form, hora: e.target.value })} />
           <input type="number" placeholder="Precio" value={form.precio} onChange={(e) => setForm({ ...form, precio: e.target.value })} style={{ maxWidth: 100 }} />
