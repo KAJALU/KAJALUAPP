@@ -1364,6 +1364,17 @@ function AsistenteIA({ clientes, citas, resenas, perfilesIA, setPerfilesIA, suge
   const [ultimosTips, setUltimosTips] = useState([]);
   const [ultimasPromos, setUltimasPromos] = useState([]);
 
+  const preguntarIA = async (prompt) => {
+    const response = await fetch("/api/ia", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Error de IA");
+    return data.text.replace(/```json|```/g, "").trim();
+  };
+
   const construirResumenClientes = () => {
     return clientes.map((c) => {
       const historial = citas
@@ -1390,18 +1401,7 @@ Genera máximo 1 perfil por cliente y máximo 2 sugerencias por cliente, basadas
 
 ${resumen}`;
 
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-6",
-          max_tokens: 1000,
-          messages: [{ role: "user", content: prompt }],
-        }),
-      });
-      const data = await response.json();
-      const textBlock = (data.content || []).map((b) => b.text || "").join("\n");
-      const clean = textBlock.replace(/```json|```/g, "").trim();
+      const clean = await preguntarIA(prompt);
       const parsed = JSON.parse(clean);
 
       // Fusiona perfiles nuevos con los existentes (así "aprende" con cada análisis)
@@ -1434,14 +1434,8 @@ Genera 4 tips de belleza breves, prácticos y originales, relacionados con esos 
 Responde ÚNICAMENTE con un JSON válido (sin texto adicional, sin backticks) con esta forma exacta:
 {"tips":[{"titulo":"...","texto":"...","categoria":"..."}]}`;
 
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 1000, messages: [{ role: "user", content: prompt }] }),
-      });
-      const data = await response.json();
-      const textBlock = (data.content || []).map((b) => b.text || "").join("\n");
-      const parsed = JSON.parse(textBlock.replace(/```json|```/g, "").trim());
+      const clean = await preguntarIA(prompt);
+      const parsed = JSON.parse(clean);
       const nuevos = (parsed.tips || []).map((t) => ({ id: uid(), ...t }));
       setTips((prev) => [...nuevos, ...prev]);
       setUltimosTips(nuevos);
@@ -1463,14 +1457,8 @@ Diseña 3 promociones rentables (combos o descuentos pensados para aumentar el t
 Responde ÚNICAMENTE con un JSON válido (sin texto adicional, sin backticks) con esta forma exacta:
 {"promos":[{"titulo":"...","categoria":"...","texto":"..."}]}`;
 
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 1000, messages: [{ role: "user", content: prompt }] }),
-      });
-      const data = await response.json();
-      const textBlock = (data.content || []).map((b) => b.text || "").join("\n");
-      const parsed = JSON.parse(textBlock.replace(/```json|```/g, "").trim());
+      const clean = await preguntarIA(prompt);
+      const parsed = JSON.parse(clean);
       const nuevas = (parsed.promos || []).map((p) => ({ id: uid(), titulo: p.titulo, categoria: p.categoria, texto: p.texto }));
       setPromosPendientes((prev) => [...nuevas, ...prev]);
       setUltimasPromos(nuevas);
