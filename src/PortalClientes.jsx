@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "./supabaseClient";
-import { Sparkles, LogOut } from "lucide-react";
+import { Sparkles, LogOut, MessageCircle } from "lucide-react";
 
 export default function PortalClientes() {
   const [session, setSession] = useState(null);
@@ -140,6 +140,21 @@ export default function PortalClientes() {
           <button className="p-signout" onClick={cerrarSesion}><LogOut size={13} />Cerrar sesión</button>
         </div>
       )}
+
+      <a
+        href="https://wa.me/573145390510?text=Hola%2C%20quiero%20agendar%20una%20cita%20con%20Kajalu%20Stetic"
+        target="_blank"
+        rel="noopener noreferrer"
+        title="Escríbenos por WhatsApp"
+        style={{
+          position: "fixed", bottom: 24, right: 24, width: 54, height: 54,
+          background: "#25D366", borderRadius: "50%", display: "flex",
+          alignItems: "center", justifyContent: "center",
+          boxShadow: "0 4px 14px rgba(0,0,0,0.28)", zIndex: 999,
+        }}
+      >
+        <MessageCircle size={26} color="white" />
+      </a>
     </div>
   );
 }

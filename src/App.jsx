@@ -586,6 +586,21 @@ export default function App() {
           />
         )}
       </main>
+
+      <a
+        href="https://wa.me/573145390510?text=Hola%2C%20quiero%20agendar%20una%20cita%20con%20Kajalu%20Stetic"
+        target="_blank"
+        rel="noopener noreferrer"
+        title="Escríbenos por WhatsApp"
+        style={{
+          position: "fixed", bottom: 24, right: 24, width: 54, height: 54,
+          background: "#25D366", borderRadius: "50%", display: "flex",
+          alignItems: "center", justifyContent: "center",
+          boxShadow: "0 4px 14px rgba(0,0,0,0.28)", zIndex: 999,
+        }}
+      >
+        <MessageCircle size={26} color="white" />
+      </a>
     </div>
   );
 }
