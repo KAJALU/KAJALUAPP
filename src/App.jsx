@@ -1131,6 +1131,11 @@ function Tips({ tips, setTips }) {
           </div>
         ))}
       </div>
+      {tips.length === 0 && <EmptyState text="Aún no hay tips guardados." />}
+    </div>
+  );
+}
+
 // ---------- Servicios y precios ----------
 function Servicios({ servicios, setServicios }) {
   const [form, setForm] = useState({ nombre: "", categoria: "", precio: "", duracion: "" });
