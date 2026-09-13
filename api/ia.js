@@ -31,7 +31,8 @@ export default async function handler(req, res) {
     );
 
     const data = await respuesta.json();
-    const texto = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    const partes = data?.candidates?.[0]?.content?.parts || [];
+    const texto = partes.filter((p) => !p.thought).map((p) => p.text || "").join("").trim();
 
     if (!texto) {
       return res.status(502).json({ error: "La IA no devolvió contenido", detalle: data });
