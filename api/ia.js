@@ -26,16 +26,23 @@ export default async function handler(req, res) {
         },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { maxOutputTokens: 4096 },
         }),
       }
     );
 
     const data = await respuesta.json();
+
+    if (!respuesta.ok) {
+      return res.status(respuesta.status).json({ error: data?.error?.message || "Error al llamar a Gemini" });
+    }
+
     const partes = data?.candidates?.[0]?.content?.parts || [];
     const texto = partes.filter((p) => !p.thought).map((p) => p.text || "").join("").trim();
 
     if (!texto) {
-      return res.status(502).json({ error: "La IA no devolvió contenido", detalle: data });
+      const razon = data?.promptFeedback?.blockReason || data?.candidates?.[0]?.finishReason || "desconocida";
+      return res.status(502).json({ error: `La IA no devolvió contenido (razón: ${razon})` });
     }
 
     return res.status(200).json({ text: texto });
