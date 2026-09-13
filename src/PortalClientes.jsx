@@ -5,7 +5,7 @@ import { Sparkles, LogOut, MessageCircle } from "lucide-react";
 export default function PortalClientes() {
   const [session, setSession] = useState(null);
   const [checkingSession, setCheckingSession] = useState(true);
-  const [modo, setModo] = useState("login"); // "login" | "registro"
+  const [modo, setModo] = useState("login"); // "login" | "registro" | "recuperar"
   const [form, setForm] = useState({ nombre: "", correo: "", clave: "" });
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState("");
@@ -14,6 +14,11 @@ export default function PortalClientes() {
   const [perfil, setPerfil] = useState(null);
   const [perfilForm, setPerfilForm] = useState({ nombre: "", telefono: "", preferencias: "" });
   const [guardando, setGuardando] = useState(false);
+
+  const [mensajeCita, setMensajeCita] = useState("");
+  const [enviandoCita, setEnviandoCita] = useState(false);
+  const [respuestaCita, setRespuestaCita] = useState("");
+  const [errorCita, setErrorCita] = useState("");
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -60,6 +65,17 @@ export default function PortalClientes() {
     if (error) setError(error.message);
   };
 
+  const recuperarClave = async () => {
+    if (!form.correo.trim()) { setError("Escribe tu correo para poder enviarte el enlace."); return; }
+    setError(""); setMensaje(""); setCargando(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(form.correo, {
+      redirectTo: window.location.origin + "/clientes",
+    });
+    setCargando(false);
+    if (error) setError(error.message);
+    else setMensaje("Te enviamos un correo con un enlace para crear una nueva contraseña.");
+  };
+
   const cerrarSesion = async () => {
     await supabase.auth.signOut();
   };
@@ -69,6 +85,62 @@ export default function PortalClientes() {
     await supabase.from("perfiles_clientes").update(perfilForm).eq("id", session.user.id);
     setGuardando(false);
     setMensaje("Datos actualizados. ¡Gracias por contarnos más sobre ti!");
+  };
+
+  const enviarSolicitudCita = async () => {
+    if (!mensajeCita.trim()) return;
+    setEnviandoCita(true); setErrorCita(""); setRespuestaCita("");
+    try {
+      const hoy = new Date().toISOString().slice(0, 10);
+      const prompt = `Eres la asistente de reservas de Kajalu Stetic, un centro de belleza. Hoy es ${hoy}.
+Una clienta escribió esta solicitud: "${mensajeCita}"
+
+Extrae los datos de la cita y responde ÚNICAMENTE con un JSON válido (sin texto adicional, sin backticks) con esta forma exacta:
+{"servicio":"nombre del servicio solicitado","fecha":"YYYY-MM-DD","hora":"HH:MM","respuesta":"mensaje corto y amable confirmando que la solicitud fue enviada, mencionando servicio, fecha y hora"}
+
+Si falta la hora, usa "10:00". Si falta la fecha, usa el próximo día hábil.`;
+
+      const res = await fetch("/api/ia", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error de IA");
+      const parsed = JSON.parse((data.text || "").replace(/```json|```/g, "").trim());
+
+      const { data: fila, error: errLectura } = await supabase
+        .from("app_data")
+        .select("data")
+        .eq("id", "main")
+        .maybeSingle();
+      if (errLectura) throw errLectura;
+
+      const actual = fila?.data || {};
+      const citasActuales = actual.citas || [];
+      const nuevaCita = {
+        id: Math.random().toString(36).slice(2, 9),
+        cliente: perfilForm.nombre || session.user.email,
+        servicio: parsed.servicio,
+        fecha: parsed.fecha,
+        hora: parsed.hora,
+        precio: 0,
+        estado: "pendiente",
+      };
+      const nuevaData = { ...actual, citas: [...citasActuales, nuevaCita] };
+
+      const { error: errGuardar } = await supabase
+        .from("app_data")
+        .upsert({ id: "main", data: nuevaData, updated_at: new Date().toISOString() });
+      if (errGuardar) throw errGuardar;
+
+      setRespuestaCita(parsed.respuesta || "¡Listo! Tu solicitud fue enviada, te confirmaremos pronto.");
+      setMensajeCita("");
+    } catch (e) {
+      setErrorCita("No pudimos procesar tu solicitud. Intenta escribirla de otra forma o usa el botón de WhatsApp.");
+    } finally {
+      setEnviandoCita(false);
+    }
   };
 
   if (checkingSession) return null;
@@ -102,7 +174,11 @@ export default function PortalClientes() {
       {!session ? (
         <div className="p-card">
           <div className="p-logo">Kajalu</div>
-          <p className="p-sub">{modo === "login" ? "Inicia sesión para agendar y ver tus beneficios." : "Regístrate para conocerte mejor y darte un mejor servicio."}</p>
+          <p className="p-sub">
+            {modo === "login" && "Inicia sesión para agendar y ver tus beneficios."}
+            {modo === "registro" && "Regístrate para conocerte mejor y darte un mejor servicio."}
+            {modo === "recuperar" && "Escribe tu correo y te enviaremos un enlace para crear una nueva contraseña."}
+          </p>
 
           {error && <div className="p-error">{error}</div>}
           {mensaje && <div className="p-msg">{mensaje}</div>}
@@ -111,15 +187,41 @@ export default function PortalClientes() {
             <input placeholder="Tu nombre" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} />
           )}
           <input type="email" placeholder="Correo electrónico" value={form.correo} onChange={(e) => setForm({ ...form, correo: e.target.value })} />
-          <input type="password" placeholder="Contraseña" value={form.clave} onChange={(e) => setForm({ ...form, clave: e.target.value })} />
 
-          <button className="p-btn" disabled={cargando} onClick={modo === "login" ? iniciarSesion : registrar}>
-            {cargando ? "Un momento…" : modo === "login" ? "Iniciar sesión" : "Registrarme"}
+          {modo !== "recuperar" && (
+            <>
+              <input type="password" placeholder="Contraseña para tu cuenta Kajalu" value={form.clave} onChange={(e) => setForm({ ...form, clave: e.target.value })} />
+              {modo === "registro" && (
+                <p style={{ fontSize: 12, color: "var(--ink-soft)", marginTop: -6, marginBottom: 10 }}>
+                  Esta contraseña es solo para tu cuenta en Kajalu — puede ser diferente a la de tu correo.
+                </p>
+              )}
+            </>
+          )}
+
+          <button
+            className="p-btn"
+            disabled={cargando}
+            onClick={modo === "login" ? iniciarSesion : modo === "registro" ? registrar : recuperarClave}
+          >
+            {cargando ? "Un momento…" : modo === "login" ? "Iniciar sesión" : modo === "registro" ? "Registrarme" : "Enviar enlace"}
           </button>
 
-          <button className="p-link" onClick={() => { setModo(modo === "login" ? "registro" : "login"); setError(""); setMensaje(""); }}>
-            {modo === "login" ? "¿No tienes cuenta? Regístrate" : "¿Ya tienes cuenta? Inicia sesión"}
+          {modo === "login" && (
+            <button className="p-link" onClick={() => { setModo("recuperar"); setError(""); setMensaje(""); }}>
+              ¿Olvidaste tu contraseña?
+            </button>
+          )}
+
+          <button className="p-link" onClick={() => { setModo(modo === "registro" ? "login" : "registro"); setError(""); setMensaje(""); }}>
+            {modo === "registro" ? "¿Ya tienes cuenta? Inicia sesión" : "¿No tienes cuenta? Regístrate"}
           </button>
+
+          {modo === "recuperar" && (
+            <button className="p-link" onClick={() => { setModo("login"); setError(""); setMensaje(""); }}>
+              Volver a iniciar sesión
+            </button>
+          )}
         </div>
       ) : (
         <div className="p-card">
@@ -135,6 +237,20 @@ export default function PortalClientes() {
 
           <button className="p-btn" disabled={guardando} onClick={guardarPerfil}>
             {guardando ? "Guardando…" : "Guardar mis datos"}
+          </button>
+
+          <div className="p-title" style={{ fontSize: 16, marginTop: 22 }}>Agenda tu cita</div>
+          <p className="p-sub" style={{ marginBottom: 8 }}>Escríbenos qué servicio quieres y cuándo — la asistente arma tu solicitud.</p>
+          {errorCita && <div className="p-error">{errorCita}</div>}
+          {respuestaCita && <div className="p-msg">{respuestaCita}</div>}
+          <textarea
+            className="p-textarea"
+            placeholder='Ej: "Quiero un masaje relajante el viernes a las 4pm"'
+            value={mensajeCita}
+            onChange={(e) => setMensajeCita(e.target.value)}
+          />
+          <button className="p-btn" disabled={enviandoCita} onClick={enviarSolicitudCita}>
+            {enviandoCita ? "Enviando…" : "Enviar solicitud"}
           </button>
 
           <button className="p-signout" onClick={cerrarSesion}><LogOut size={13} />Cerrar sesión</button>

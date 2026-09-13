@@ -174,6 +174,8 @@ export default function App() {
   const [perfilesIA, setPerfilesIA] = useState([]);
   const [sugerenciasIA, setSugerenciasIA] = useState([]);
   const [promosPendientes, setPromosPendientes] = useState([]);
+  const [publicacionesPendientes, setPublicacionesPendientes] = useState([]);
+  const [publicacionesAprobadas, setPublicacionesAprobadas] = useState([]);
 
   const [loaded, setLoaded] = useState(false);
   const [saveError, setSaveError] = useState(false);
@@ -208,6 +210,8 @@ export default function App() {
           if (data.perfilesIA) setPerfilesIA(data.perfilesIA);
           if (data.sugerenciasIA) setSugerenciasIA(data.sugerenciasIA);
           if (data.promosPendientes) setPromosPendientes(data.promosPendientes);
+          if (data.publicacionesPendientes) setPublicacionesPendientes(data.publicacionesPendientes);
+          if (data.publicacionesAprobadas) setPublicacionesAprobadas(data.publicacionesAprobadas);
         }
       } catch (e) {
         // Aún no hay datos guardados: se usan los datos de ejemplo
@@ -221,12 +225,12 @@ export default function App() {
   // Guardar automáticamente en Supabase cada vez que algo cambia
   useEffect(() => {
     if (!loaded) return;
-    const data = { clientes, citas, productos, compras, gastos, ventas, tareas, notas, recordatorios, tips, plantillas, servicios, resenas, pautas, perfilesIA, sugerenciasIA, promosPendientes };
+    const data = { clientes, citas, productos, compras, gastos, ventas, tareas, notas, recordatorios, tips, plantillas, servicios, resenas, pautas, perfilesIA, sugerenciasIA, promosPendientes, publicacionesPendientes, publicacionesAprobadas };
     supabase
       .from("app_data")
       .upsert({ id: "main", data, updated_at: new Date().toISOString() })
       .then(({ error }) => setSaveError(!!error));
-  }, [loaded, clientes, citas, productos, compras, gastos, ventas, tareas, notas, recordatorios, tips, plantillas, servicios, resenas, pautas, perfilesIA, sugerenciasIA, promosPendientes]);
+  }, [loaded, clientes, citas, productos, compras, gastos, ventas, tareas, notas, recordatorios, tips, plantillas, servicios, resenas, pautas, perfilesIA, sugerenciasIA, promosPendientes, publicacionesPendientes, publicacionesAprobadas]);
 
   const tabs = [
     { id: "inicio", label: "Inicio", icon: <Home size={18} /> },
@@ -526,6 +530,7 @@ export default function App() {
               setTips(seedTips); setPlantillas(seedPlantillas);
               setServicios(seedServicios); setResenas(seedResenas); setPautas(seedPautas);
               setPerfilesIA([]); setSugerenciasIA([]); setPromosPendientes([]);
+              setPublicacionesPendientes([]); setPublicacionesAprobadas([]);
             }}
           >
             Restablecer datos
@@ -597,6 +602,10 @@ export default function App() {
             setPautas={setPautas}
             promosPendientes={promosPendientes}
             setPromosPendientes={setPromosPendientes}
+            publicacionesPendientes={publicacionesPendientes}
+            setPublicacionesPendientes={setPublicacionesPendientes}
+            publicacionesAprobadas={publicacionesAprobadas}
+            setPublicacionesAprobadas={setPublicacionesAprobadas}
           />
         )}
       </main>
@@ -1354,7 +1363,7 @@ function Pautas({ pautas, setPautas }) {
 }
 
 // ---------- Asistente IA (fidelización y gestión autónoma de tareas) ----------
-function AsistenteIA({ clientes, citas, resenas, perfilesIA, setPerfilesIA, sugerenciasIA, setSugerenciasIA, setTareas, setRecordatorios, servicios, setTips, setPautas, promosPendientes, setPromosPendientes }) {
+function AsistenteIA({ clientes, citas, resenas, perfilesIA, setPerfilesIA, sugerenciasIA, setSugerenciasIA, setTareas, setRecordatorios, servicios, setTips, setPautas, promosPendientes, setPromosPendientes, publicacionesPendientes, setPublicacionesPendientes, publicacionesAprobadas, setPublicacionesAprobadas }) {
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState("");
   const [cargandoTips, setCargandoTips] = useState(false);
@@ -1475,6 +1484,42 @@ Responde ÚNICAMENTE con un JSON válido (sin texto adicional, sin backticks) co
     }
   };
 
+  const [cargandoPub, setCargandoPub] = useState(false);
+  const [errorPub, setErrorPub] = useState("");
+
+  const generarPublicacion = async () => {
+    setCargandoPub(true); setErrorPub("");
+    try {
+      const listaServicios = servicios.map((s) => s.nombre).join(", ") || "servicios de belleza en general";
+      const prompt = `Eres la community manager de Kajalu Stetic, un centro de belleza. Sus servicios son: ${listaServicios}.
+Crea 2 publicaciones distintas para Instagram/Facebook, atractivas y breves (2-4 líneas cada una), con 4-5 hashtags relevantes cada una.
+Responde ÚNICAMENTE con un JSON válido (sin texto adicional, sin backticks) con esta forma exacta:
+{"publicaciones":[{"titulo":"...","texto":"...","hashtags":"#ejemplo1 #ejemplo2"}]}`;
+
+      const clean = await preguntarIA(prompt);
+      const parsed = JSON.parse(clean);
+      const nuevas = (parsed.publicaciones || []).map((p) => ({ id: uid(), titulo: p.titulo, texto: p.texto, hashtags: p.hashtags }));
+      setPublicacionesPendientes((prev) => [...nuevas, ...prev]);
+    } catch (e) {
+      setErrorPub("Error: " + e.message);
+    } finally {
+      setCargandoPub(false);
+    }
+  };
+
+  const aprobarPublicacion = (p) => {
+    setPublicacionesAprobadas((prev) => [p, ...prev]);
+    setPublicacionesPendientes((prev) => prev.filter((x) => x.id !== p.id));
+  };
+
+  const descartarPublicacion = (id) => {
+    setPublicacionesPendientes((prev) => prev.filter((x) => x.id !== id));
+  };
+
+  const copiarTexto = (p) => {
+    navigator.clipboard.writeText(`${p.texto}\n\n${p.hashtags || ""}`);
+  };
+
   const aprobarPromo = (p) => {
     setPautas((ps) => [...ps, { id: uid(), titulo: p.titulo, categoria: p.categoria, texto: p.texto }]);
     setPromosPendientes((pp) => pp.filter((x) => x.id !== p.id));
@@ -1549,6 +1594,51 @@ Responde ÚNICAMENTE con un JSON válido (sin texto adicional, sin backticks) co
               Se generaron {ultimasPromos.length} promociones — revísalas abajo antes de publicarlas.
             </p>
           )}
+        </Card>
+      </div>
+
+      <Card>
+        <h3>Publicaciones para redes sociales con IA</h3>
+        <p style={{ margin: "0 0 12px", fontSize: 13.5, color: "var(--ink-soft)" }}>
+          Genera textos listos para Instagram/Facebook. Nada se publica solo — tú apruebas y copias cada uno para publicarlo donde quieras.
+        </p>
+        <button className="k-btn" onClick={generarPublicacion} disabled={cargandoPub}>
+          {cargandoPub ? <Loader2 size={14} className="k-spin" /> : <Sparkles size={14} />}
+          {cargandoPub ? "Generando…" : "Generar publicación"}
+        </button>
+        {errorPub && <p style={{ color: "var(--danger)", fontSize: 13, marginTop: 10 }}>{errorPub}</p>}
+      </Card>
+
+      <div className="k-grid cols-2">
+        <Card>
+          <h3>Publicaciones pendientes de tu aprobación</h3>
+          {publicacionesPendientes.length === 0 && <EmptyState text="No hay publicaciones esperando revisión." />}
+          {publicacionesPendientes.map((p) => (
+            <div className="k-list-row" key={p.id}>
+              <div className="main">
+                <div className="title">{p.titulo}</div>
+                <div className="sub">{p.texto}</div>
+                <div className="sub" style={{ color: "var(--accent)" }}>{p.hashtags}</div>
+              </div>
+              <button className="k-btn" style={{ fontSize: 12, padding: "6px 10px" }} onClick={() => aprobarPublicacion(p)}>Aprobar</button>
+              <IconBtn danger onClick={() => descartarPublicacion(p.id)} title="Descartar"><Trash2 size={14} /></IconBtn>
+            </div>
+          ))}
+        </Card>
+
+        <Card>
+          <h3>Publicaciones aprobadas (listas para copiar)</h3>
+          {publicacionesAprobadas.length === 0 && <EmptyState text="Las que apruebes van a aparecer aquí." />}
+          {publicacionesAprobadas.map((p) => (
+            <div className="k-list-row" key={p.id}>
+              <div className="main">
+                <div className="title">{p.titulo}</div>
+                <div className="sub">{p.texto}</div>
+                <div className="sub" style={{ color: "var(--accent)" }}>{p.hashtags}</div>
+              </div>
+              <button className="k-btn ghost" style={{ fontSize: 12, padding: "6px 10px" }} onClick={() => copiarTexto(p)}>Copiar texto</button>
+            </div>
+          ))}
         </Card>
       </div>
 
