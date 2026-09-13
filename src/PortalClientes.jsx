@@ -46,23 +46,41 @@ export default function PortalClientes() {
     })();
   }, [session]);
 
+  const contraseñaValida = (clave) =>
+    /^(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>_\-]).{6,}$/.test(clave);
+
   const registrar = async () => {
-    setError(""); setMensaje(""); setCargando(true);
-    const { error } = await supabase.auth.signUp({
-      email: form.correo,
-      password: form.clave,
-      options: { data: { nombre: form.nombre } },
-    });
-    setCargando(false);
-    if (error) setError(error.message);
-    else setMensaje("¡Cuenta creada! Revisa tu correo para confirmar (si aplica) y luego inicia sesión.");
+    setError(""); setMensaje("");
+    if (!contraseñaValida(form.clave)) {
+      setError("La contraseña debe tener mínimo 6 caracteres, con al menos 1 mayúscula, 1 número y 1 carácter especial.");
+      return;
+    }
+    setCargando(true);
+    try {
+      const { error } = await supabase.auth.signUp({
+        email: form.correo,
+        password: form.clave,
+        options: { data: { nombre: form.nombre } },
+      });
+      if (error) setError(error.message);
+      else setMensaje("¡Cuenta creada! Revisa tu correo para confirmar (si aplica) y luego inicia sesión.");
+    } catch (e) {
+      setError("No se pudo conectar. Si usas VPN o un bloqueador de anuncios, desactívalo e intenta de nuevo.");
+    } finally {
+      setCargando(false);
+    }
   };
 
   const iniciarSesion = async () => {
     setError(""); setMensaje(""); setCargando(true);
-    const { error } = await supabase.auth.signInWithPassword({ email: form.correo, password: form.clave });
-    setCargando(false);
-    if (error) setError(error.message);
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email: form.correo, password: form.clave });
+      if (error) setError(error.message);
+    } catch (e) {
+      setError("No se pudo conectar. Si usas VPN o un bloqueador de anuncios, desactívalo e intenta de nuevo.");
+    } finally {
+      setCargando(false);
+    }
   };
 
   const recuperarClave = async () => {
@@ -193,7 +211,7 @@ Si falta la hora, usa "10:00". Si falta la fecha, usa el próximo día hábil.`;
               <input type="password" placeholder="Contraseña para tu cuenta Kajalu" value={form.clave} onChange={(e) => setForm({ ...form, clave: e.target.value })} />
               {modo === "registro" && (
                 <p style={{ fontSize: 12, color: "var(--ink-soft)", marginTop: -6, marginBottom: 10 }}>
-                  Esta contraseña es solo para tu cuenta en Kajalu — puede ser diferente a la de tu correo.
+                  Mínimo 6 caracteres, con al menos 1 mayúscula, 1 número y 1 carácter especial (ej: Kajalu2026!). Puede ser diferente a la contraseña de tu correo.
                 </p>
               )}
             </>
