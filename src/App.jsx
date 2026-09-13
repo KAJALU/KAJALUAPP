@@ -1370,8 +1370,14 @@ function AsistenteIA({ clientes, citas, resenas, perfilesIA, setPerfilesIA, suge
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ prompt }),
     });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "Error de IA");
+    let data;
+    try {
+      data = await response.json();
+    } catch (e) {
+      throw new Error(`Respuesta inesperada del servidor (código ${response.status}, no es JSON)`);
+    }
+    if (!response.ok) throw new Error(`(${response.status}) ${data.error || "Error de IA"}`);
+    if (!data.text) throw new Error("La IA no devolvió texto");
     return data.text.replace(/```json|```/g, "").trim();
   };
 
@@ -1419,7 +1425,7 @@ ${resumen}`;
         ...prev,
       ]);
     } catch (e) {
-      setError("No se pudo completar el análisis. Intenta de nuevo en un momento.");
+      setError("Error: " + e.message);
     } finally {
       setCargando(false);
     }
@@ -1440,7 +1446,7 @@ Responde ÚNICAMENTE con un JSON válido (sin texto adicional, sin backticks) co
       setTips((prev) => [...nuevos, ...prev]);
       setUltimosTips(nuevos);
     } catch (e) {
-      setErrorTips("No se pudieron generar los tips. Intenta de nuevo.");
+      setErrorTips("Error: " + e.message);
     } finally {
       setCargandoTips(false);
     }
@@ -1463,7 +1469,7 @@ Responde ÚNICAMENTE con un JSON válido (sin texto adicional, sin backticks) co
       setPromosPendientes((prev) => [...nuevas, ...prev]);
       setUltimasPromos(nuevas);
     } catch (e) {
-      setErrorPromos("No se pudieron generar las promociones. Intenta de nuevo.");
+      setErrorPromos("Error: " + e.message);
     } finally {
       setCargandoPromos(false);
     }
