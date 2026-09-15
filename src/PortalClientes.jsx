@@ -139,6 +139,16 @@ Si falta la hora, usa "10:00". Si falta la fecha, usa el próximo día hábil.`;
       const nombreCliente = perfilForm.nombre || session.user.email;
       const correoCliente = session.user.email;
 
+      // Verificar disponibilidad: ¿ya hay una cita activa en esa misma fecha y hora?
+      const horarioOcupado = citasActuales.some(
+        (c) => c.fecha === parsed.fecha && c.hora === parsed.hora && c.estado !== "cancelada"
+      );
+      if (horarioOcupado) {
+        setErrorCita("Ese horario ya está reservado. Por favor elige otra fecha u hora.");
+        setEnviandoCita(false);
+        return;
+      }
+
       const nuevaCita = {
         id: Math.random().toString(36).slice(2, 9),
         cliente: nombreCliente,
@@ -179,7 +189,9 @@ Si falta la hora, usa "10:00". Si falta la fecha, usa el próximo día hábil.`;
         console.error("No se pudo enviar el correo de confirmación:", errCorreo);
       }
 
-      setRespuestaCita(parsed.respuesta || "¡Listo! Tu solicitud fue enviada, te confirmaremos pronto.");
+      setRespuestaCita(
+        `Recibimos tu solicitud para ${parsed.servicio} el ${parsed.fecha} a las ${parsed.hora}. Está pendiente de confirmar disponibilidad, te avisaremos pronto.`
+      );
       setMensajeCita("");
     } catch (e) {
       setErrorCita("No pudimos procesar tu solicitud. Intenta escribirla de otra forma o usa el botón de WhatsApp.");
