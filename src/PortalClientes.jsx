@@ -45,6 +45,7 @@ export default function PortalClientes() {
   const [nuevaPestañaTipo, setNuevaPestañaTipo] = useState("info");
   const [mostrandoFormPestaña, setMostrandoFormPestaña] = useState(false);
   const [textoResena, setTextoResena] = useState("");
+  const [servicios, setServicios] = useState([]);
   const esAdmin = !!session && ADMIN_EMAILS.includes((session.user.email || "").toLowerCase());
 
   const [mensajeDelDia, setMensajeDelDia] = useState("¡Bienvenida a Kajalu!");
@@ -93,6 +94,7 @@ export default function PortalClientes() {
         setContenido(contenidoGuardado);
         setTabActiva(contenidoGuardado.tabs[0].id);
       }
+      if (fila?.data?.servicios) setServicios(fila.data.servicios);
 
       const hoy = new Date().toISOString().slice(0, 10);
       const mensajeGuardado = fila?.data?.mensajeDia;
@@ -248,10 +250,32 @@ export default function PortalClientes() {
     await supabase.auth.signOut();
   };
 
+  const sincronizarClienteAdmin = async (nombre, telefono, notas) => {
+    const { data: fila } = await supabase.from("app_data").select("data").eq("id", "main").maybeSingle();
+    const actual = fila?.data || {};
+    const clientesActuales = actual.clientes || [];
+    const idx = clientesActuales.findIndex((c) => c.clienteId === session.user.id);
+    let nuevosClientes;
+    if (idx >= 0) {
+      nuevosClientes = clientesActuales.map((c, i) => (i === idx ? { ...c, nombre, telefono, notas } : c));
+    } else {
+      nuevosClientes = [
+        ...clientesActuales,
+        { id: Math.random().toString(36).slice(2, 9), clienteId: session.user.id, nombre, telefono, notas },
+      ];
+    }
+    await supabase.from("app_data").upsert({
+      id: "main",
+      data: { ...actual, clientes: nuevosClientes },
+      updated_at: new Date().toISOString(),
+    });
+  };
+
   const guardarPerfil = async () => {
     setGuardando(true);
     await supabase.from("perfiles_clientes").update(perfilForm).eq("id", session.user.id);
     setPerfil({ ...(perfil || {}), ...perfilForm });
+    await sincronizarClienteAdmin(perfilForm.nombre, perfilForm.telefono, perfilForm.preferencias);
     setGuardando(false);
     setMensaje("Datos actualizados. ¡Gracias por contarnos más sobre ti!");
   };
@@ -490,6 +514,9 @@ Si falta la hora, usa "10:00". Si falta la fecha, usa el próximo día hábil.`;
               <button className={`k-nav-item ${vista === "citas" ? "k-nav-activo" : ""}`} onClick={() => irA("citas")}>
                 <Calendar size={17} /> Agendar cita
               </button>
+              <button className={`k-nav-item ${vista === "precios" ? "k-nav-activo" : ""}`} onClick={() => irA("precios")}>
+                <Tag size={17} /> Lista de precios
+              </button>
               {contenido.tabs.map((t) => {
                 const Icono = iconoDePestaña(t.tipo);
                 return (
@@ -553,6 +580,37 @@ Si falta la hora, usa "10:00". Si falta la fecha, usa el próximo día hábil.`;
                 <button className="p-btn" disabled={enviandoCita} onClick={enviarSolicitudCita}>
                   {enviandoCita ? "Enviando…" : "Enviar solicitud"}
                 </button>
+              </div>
+            )}
+
+            {vista === "precios" && (
+              <div className="k-panel">
+                <div className="p-title" style={{ fontSize: 16, marginBottom: 10 }}>Lista de precios</div>
+                {servicios.length === 0 && (
+                  <p className="p-sub" style={{ margin: 0 }}>Todavía no hay servicios publicados.</p>
+                )}
+                {Object.entries(
+                  servicios.reduce((acc, s) => {
+                    const cat = s.categoria || "Otros";
+                    (acc[cat] = acc[cat] || []).push(s);
+                    return acc;
+                  }, {})
+                ).map(([cat, lista]) => (
+                  <div key={cat} style={{ marginBottom: 14 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13.5, marginBottom: 6, color: "var(--accent)" }}>{cat}</div>
+                    {lista.map((s) => (
+                      <div className="p-item" key={s.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div>
+                          <div className="p-item-titulo">{s.nombre}</div>
+                          {s.duracion && <div className="p-item-detalle">{s.duracion}</div>}
+                        </div>
+                        <div style={{ fontWeight: 600 }}>
+                          {s.precio ? `$${Number(s.precio).toLocaleString("es-CO")}` : "Consultar"}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ))}
               </div>
             )}
 

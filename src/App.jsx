@@ -4,7 +4,7 @@ import {
   Home, CalendarCheck, Users, Package, Wallet, CheckSquare, BellRing,
   MessageCircle, Sparkles, Plus, Trash2, Phone, AlertTriangle,
   TrendingUp, TrendingDown, ShoppingCart, ChevronRight, Sun,
-  Tag, Star, Megaphone, Bot, Loader2, CheckCircle2
+  Tag, Star, Megaphone, Bot, Loader2, CheckCircle2, Receipt, Copy
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
@@ -176,6 +176,7 @@ export default function App() {
   const [promosPendientes, setPromosPendientes] = useState([]);
   const [publicacionesPendientes, setPublicacionesPendientes] = useState([]);
   const [publicacionesAprobadas, setPublicacionesAprobadas] = useState([]);
+  const [cotizaciones, setCotizaciones] = useState([]);
 
   const [loaded, setLoaded] = useState(false);
   const [saveError, setSaveError] = useState(false);
@@ -212,6 +213,7 @@ export default function App() {
           if (data.promosPendientes) setPromosPendientes(data.promosPendientes);
           if (data.publicacionesPendientes) setPublicacionesPendientes(data.publicacionesPendientes);
           if (data.publicacionesAprobadas) setPublicacionesAprobadas(data.publicacionesAprobadas);
+          if (data.cotizaciones) setCotizaciones(data.cotizaciones);
         }
       } catch (e) {
         // Aún no hay datos guardados: se usan los datos de ejemplo
@@ -225,18 +227,19 @@ export default function App() {
   // Guardar automáticamente en Supabase cada vez que algo cambia
   useEffect(() => {
     if (!loaded) return;
-    const data = { clientes, citas, productos, compras, gastos, ventas, tareas, notas, recordatorios, tips, plantillas, servicios, resenas, pautas, perfilesIA, sugerenciasIA, promosPendientes, publicacionesPendientes, publicacionesAprobadas };
+    const data = { clientes, citas, productos, compras, gastos, ventas, tareas, notas, recordatorios, tips, plantillas, servicios, resenas, pautas, perfilesIA, sugerenciasIA, promosPendientes, publicacionesPendientes, publicacionesAprobadas, cotizaciones };
     supabase
       .from("app_data")
       .upsert({ id: "main", data, updated_at: new Date().toISOString() })
       .then(({ error }) => setSaveError(!!error));
-  }, [loaded, clientes, citas, productos, compras, gastos, ventas, tareas, notas, recordatorios, tips, plantillas, servicios, resenas, pautas, perfilesIA, sugerenciasIA, promosPendientes, publicacionesPendientes, publicacionesAprobadas]);
+  }, [loaded, clientes, citas, productos, compras, gastos, ventas, tareas, notas, recordatorios, tips, plantillas, servicios, resenas, pautas, perfilesIA, sugerenciasIA, promosPendientes, publicacionesPendientes, publicacionesAprobadas, cotizaciones]);
 
   const tabs = [
     { id: "inicio", label: "Inicio", icon: <Home size={18} /> },
     { id: "citas", label: "Citas", icon: <CalendarCheck size={18} /> },
     { id: "clientes", label: "Clientes", icon: <Users size={18} /> },
     { id: "servicios", label: "Servicios y precios", icon: <Tag size={18} /> },
+    { id: "cotizaciones", label: "Cotizaciones", icon: <Receipt size={18} /> },
     { id: "catalogo", label: "Catálogo", icon: <Package size={18} /> },
     { id: "finanzas", label: "Finanzas", icon: <Wallet size={18} /> },
     { id: "resenas", label: "Reseñas", icon: <Star size={18} /> },
@@ -485,6 +488,8 @@ export default function App() {
         table.k-table th { text-align: left; font-size: 11.5px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.03em; padding: 6px 8px; font-weight: 600; }
         table.k-table td { padding: 9px 8px; border-top: 1px solid var(--line); }
 
+        .k-cotiz-preview { white-space: pre-wrap; background: var(--bg); border: 1px dashed var(--line); border-radius: 10px; padding: 14px; font-size: 13.5px; line-height: 1.5; }
+
         @media (max-width: 760px) {
           .k-root { flex-direction: column; }
           .k-sidebar { width: 100%; flex-direction: row; align-items: center; overflow-x: auto; padding: 10px 12px; }
@@ -530,7 +535,7 @@ export default function App() {
               setTips(seedTips); setPlantillas(seedPlantillas);
               setServicios(seedServicios); setResenas(seedResenas); setPautas(seedPautas);
               setPerfilesIA([]); setSugerenciasIA([]); setPromosPendientes([]);
-              setPublicacionesPendientes([]); setPublicacionesAprobadas([]);
+              setPublicacionesPendientes([]); setPublicacionesAprobadas([]); setCotizaciones([]);
             }}
           >
             Restablecer datos
@@ -555,6 +560,9 @@ export default function App() {
         )}
         {activeTab === "clientes" && <Clientes clientes={clientes} setClientes={setClientes} citas={citas} />}
         {activeTab === "servicios" && <Servicios servicios={servicios} setServicios={setServicios} />}
+        {activeTab === "cotizaciones" && (
+          <Cotizaciones servicios={servicios} clientes={clientes} cotizaciones={cotizaciones} setCotizaciones={setCotizaciones} />
+        )}
         {activeTab === "catalogo" && (
           <Catalogo
             productos={productos}
@@ -812,7 +820,7 @@ function Clientes({ clientes, setClientes, citas }) {
 
   return (
     <div>
-      <SectionHeader icon={<Users size={18} />} title="Base de datos de clientes" subtitle="Contactos, preferencias y su historial contigo." />
+      <SectionHeader icon={<Users size={18} />} title="Base de datos de clientes" subtitle="Contactos, preferencias y su historial contigo. Las clientas que se registran en el portal aparecen aquí automáticamente." />
       <Card>
         <h3>Agregar cliente</h3>
         <div className="k-form">
@@ -1223,7 +1231,7 @@ function Servicios({ servicios, setServicios }) {
 
   return (
     <div>
-      <SectionHeader icon={<Tag size={18} />} title="Servicios y precios ofrecidos" subtitle="El menú de servicios que le muestras a tus clientas." />
+      <SectionHeader icon={<Tag size={18} />} title="Servicios y precios ofrecidos" subtitle="El menú de servicios que le muestras a tus clientas. También aparece en el portal de clientas y en Cotizaciones." />
       <Card>
         <img src="/folleto-servicios.jpg" alt="Folleto de servicios Kajalu Stetic" style={{ width: "100%", maxWidth: 340, display: "block", margin: "0 auto", borderRadius: 12 }} />
       </Card>
@@ -1254,6 +1262,144 @@ function Servicios({ servicios, setServicios }) {
           ))}
         </Card>
       ))}
+    </div>
+  );
+}
+
+// ---------- Cotizaciones ----------
+function Cotizaciones({ servicios, clientes, cotizaciones, setCotizaciones }) {
+  const [clienteNombre, setClienteNombre] = useState("");
+  const [seleccionados, setSeleccionados] = useState([]); // ids de servicios elegidos
+  const [descuento, setDescuento] = useState(0);
+  const [copiado, setCopiado] = useState(false);
+
+  const toggleServicio = (id) => {
+    setSeleccionados((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+    setCopiado(false);
+  };
+
+  const itemsElegidos = servicios.filter((s) => seleccionados.includes(s.id));
+  const subtotal = itemsElegidos.reduce((s, it) => s + (Number(it.precio) || 0), 0);
+  const totalConDescuento = Math.round(subtotal - (subtotal * (Number(descuento) || 0)) / 100);
+
+  const clienteInfo = clientes.find((c) => c.nombre === clienteNombre);
+
+  const textoCotizacion = () => {
+    const lineas = itemsElegidos.map((it) => `- ${it.nombre}: ${money(it.precio)}`).join("\n");
+    let texto = `Cotización · Kajalu Stetic\n`;
+    if (clienteNombre) texto += `Para: ${clienteNombre}\n`;
+    texto += `\n${lineas || "(sin servicios seleccionados)"}\n\nSubtotal: ${money(subtotal)}`;
+    if (Number(descuento) > 0) texto += `\nDescuento: ${descuento}%\nTotal: ${money(totalConDescuento)}`;
+    texto += `\n\n¿Deseas agendar? Escríbenos por WhatsApp al 314 539 0510.`;
+    return texto;
+  };
+
+  const copiarCotizacion = () => {
+    navigator.clipboard.writeText(textoCotizacion());
+    setCopiado(true);
+  };
+
+  const guardarCotizacion = () => {
+    if (itemsElegidos.length === 0) return;
+    setCotizaciones((prev) => [
+      { id: uid(), cliente: clienteNombre || "Sin nombre", items: itemsElegidos.map((i) => i.nombre), total: totalConDescuento || subtotal, fecha: todayISO },
+      ...prev,
+    ]);
+  };
+
+  const numeroWhatsapp = () => {
+    if (!clienteInfo?.telefono) return null;
+    const digitos = clienteInfo.telefono.replace(/\D/g, "");
+    return digitos.length === 10 ? `57${digitos}` : digitos;
+  };
+
+  const porCategoria = servicios.reduce((acc, s) => {
+    const cat = s.categoria || "Otros";
+    (acc[cat] = acc[cat] || []).push(s);
+    return acc;
+  }, {});
+
+  return (
+    <div>
+      <SectionHeader icon={<Receipt size={18} />} title="Plantilla de cotizaciones" subtitle="Arma una cotización con tus servicios reales y envíasela a la clienta por WhatsApp." />
+
+      <Card>
+        <h3>1. Elige la clienta (opcional)</h3>
+        <div className="k-form">
+          <input list="clientes-cotizacion" placeholder="Nombre de la clienta" value={clienteNombre} onChange={(e) => setClienteNombre(e.target.value)} />
+          <datalist id="clientes-cotizacion">
+            {clientes.map((c) => <option key={c.id} value={c.nombre} />)}
+          </datalist>
+        </div>
+      </Card>
+
+      <Card>
+        <h3>2. Selecciona los servicios</h3>
+        {Object.keys(porCategoria).length === 0 && <EmptyState text="Primero agrega servicios en 'Servicios y precios'." />}
+        {Object.entries(porCategoria).map(([cat, lista]) => (
+          <div key={cat} style={{ marginBottom: 10 }}>
+            <div style={{ fontWeight: 600, fontSize: 13, color: "var(--ink-soft)", marginBottom: 4 }}>{cat}</div>
+            {lista.map((s) => (
+              <div className="k-list-row" key={s.id}>
+                <div
+                  className={"k-checkbox" + (seleccionados.includes(s.id) ? " checked" : "")}
+                  onClick={() => toggleServicio(s.id)}
+                >
+                  {seleccionados.includes(s.id) && <CheckCircle2 size={12} />}
+                </div>
+                <div className="main" style={{ marginLeft: 10 }}>
+                  <div className="title">{s.nombre}</div>
+                </div>
+                <div style={{ fontWeight: 600 }}>{money(s.precio)}</div>
+              </div>
+            ))}
+          </div>
+        ))}
+      </Card>
+
+      <Card>
+        <h3>3. Descuento (opcional)</h3>
+        <div className="k-form">
+          <input type="number" placeholder="% de descuento" value={descuento} onChange={(e) => setDescuento(e.target.value)} style={{ maxWidth: 140 }} />
+        </div>
+      </Card>
+
+      <Card>
+        <h3>Vista previa de la cotización</h3>
+        <div className="k-cotiz-preview">{textoCotizacion()}</div>
+        <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+          <button className="k-btn" onClick={copiarCotizacion}><Copy size={14} />{copiado ? "¡Copiado!" : "Copiar cotización"}</button>
+          {numeroWhatsapp() ? (
+            <a
+              className="k-btn"
+              style={{ background: "#25D366", textDecoration: "none" }}
+              href={`https://wa.me/${numeroWhatsapp()}?text=${encodeURIComponent(textoCotizacion())}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <MessageCircle size={14} />Enviar por WhatsApp
+            </a>
+          ) : (
+            <span className="k-empty" style={{ padding: "8px 0" }}>Agrega el teléfono de la clienta en "Clientes" para enviar directo por WhatsApp.</span>
+          )}
+          <button className="k-btn ghost" onClick={guardarCotizacion}><Plus size={14} />Guardar en historial</button>
+        </div>
+      </Card>
+
+      <Card>
+        <h3>Historial de cotizaciones</h3>
+        {cotizaciones.length === 0 && <EmptyState text="Aún no has guardado ninguna cotización." />}
+        {cotizaciones.map((c) => (
+          <div className="k-list-row" key={c.id}>
+            <div className="main">
+              <div className="title">{c.cliente} · {money(c.total)}</div>
+              <div className="sub">{c.items.join(", ")}</div>
+              <div className="sub">{c.fecha}</div>
+            </div>
+            <IconBtn danger onClick={() => setCotizaciones((cs) => cs.filter((x) => x.id !== c.id))}><Trash2 size={14} /></IconBtn>
+          </div>
+        ))}
+      </Card>
     </div>
   );
 }
@@ -1419,7 +1565,6 @@ ${resumen}`;
       const clean = await preguntarIA(prompt);
       const parsed = JSON.parse(clean);
 
-      // Fusiona perfiles nuevos con los existentes (así "aprende" con cada análisis)
       setPerfilesIA((prev) => {
         const mapa = {};
         prev.forEach((p) => { mapa[p.cliente] = p; });
