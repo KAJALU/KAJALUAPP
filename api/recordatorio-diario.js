@@ -18,6 +18,16 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+function formatearHora(horaStr) {
+  if (!horaStr) return '';
+  const [horas, minutos] = horaStr.split(':');
+  let h = parseInt(horas, 10);
+  const ampm = h >= 12 ? 'p.m.' : 'a.m.';
+  h = h % 12;
+  if (h === 0) h = 12;
+  return `${h}:${minutos} ${ampm}`;
+}
+
 export default async function handler(req, res) {
   try {
     const manana = new Date();
@@ -39,7 +49,7 @@ export default async function handler(req, res) {
 
     for (const cita of citas) {
       try {
-        const horaTexto = cita.hora ? ` a las ${cita.hora.slice(0, 5)}` : '';
+        const horaTexto = cita.hora ? ` a las ${formatearHora(cita.hora)}` : '';
         await transporter.sendMail({
           from: `"Kajalu Stetic" <${process.env.EMAIL_USER}>`,
           to: cita.correo,
