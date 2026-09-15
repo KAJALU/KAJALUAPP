@@ -1,6 +1,6 @@
 // api/enviar-recordatorio.js
-// Función serverless de Vercel: se ejecuta en el servidor, nunca en el navegador,
-// así que aquí es seguro usar la contraseña de aplicación de Gmail.
+// Función serverless de Vercel: se llama justo cuando una clienta agenda una cita,
+// para enviarle la confirmación inmediata por correo.
 
 import nodemailer from 'nodemailer';
 
@@ -13,33 +13,34 @@ const transporter = nodemailer.createTransport({
 });
 
 export default async function handler(req, res) {
-  // Solo aceptar peticiones POST
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Método no permitido' });
   }
 
-  const { destinatario, nombreCliente, fechaCita } = req.body;
+  const { destinatario, nombreCliente, fechaCita, horaCita } = req.body;
 
   if (!destinatario || !nombreCliente || !fechaCita) {
     return res.status(400).json({ error: 'Faltan datos: destinatario, nombreCliente o fechaCita' });
   }
 
+  const horaTexto = horaCita ? ` a las ${horaCita}` : '';
+
   try {
     await transporter.sendMail({
       from: `"Kajalu Stetic" <${process.env.EMAIL_USER}>`,
       to: destinatario,
-      subject: 'Recordatorio de tu cita en Kajalu Stetic',
+      subject: 'Confirmación de tu cita en Kajalu Stetic',
       html: `
         <div style="font-family: sans-serif; padding: 20px;">
           <h2>¡Hola ${nombreCliente}!</h2>
-          <p>Te recordamos tu cita programada para el <strong>${fechaCita}</strong>.</p>
+          <p>Tu cita en <strong>Kajalu Stetic</strong> quedó agendada para el <strong>${fechaCita}${horaTexto}</strong>.</p>
           <p>Si necesitas reprogramar, escríbenos por WhatsApp al 314 539 0510.</p>
-          <p>¡Te esperamos en Kajalu Stetic!</p>
+          <p>¡Te esperamos!</p>
         </div>
       `,
     });
 
-    return res.status(200).json({ success: true, message: 'Recordatorio enviado correctamente' });
+    return res.status(200).json({ success: true, message: 'Confirmación enviada correctamente' });
   } catch (error) {
     console.error('Error al enviar el correo:', error);
     return res.status(500).json({ error: 'No se pudo enviar el correo' });

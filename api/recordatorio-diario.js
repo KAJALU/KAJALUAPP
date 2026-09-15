@@ -20,14 +20,13 @@ const transporter = nodemailer.createTransport({
 
 export default async function handler(req, res) {
   try {
-    // Calcular la fecha de mañana en formato YYYY-MM-DD
     const manana = new Date();
     manana.setDate(manana.getDate() + 1);
     const fechaManana = manana.toISOString().split('T')[0];
 
     const { data: citas, error } = await supabase
       .from('citas')
-      .select('correo, nombre, fecha')
+      .select('correo, nombre, fecha, hora')
       .eq('fecha', fechaManana);
 
     if (error) throw error;
@@ -40,6 +39,7 @@ export default async function handler(req, res) {
 
     for (const cita of citas) {
       try {
+        const horaTexto = cita.hora ? ` a las ${cita.hora.slice(0, 5)}` : '';
         await transporter.sendMail({
           from: `"Kajalu Stetic" <${process.env.EMAIL_USER}>`,
           to: cita.correo,
@@ -47,7 +47,7 @@ export default async function handler(req, res) {
           html: `
             <div style="font-family: sans-serif; padding: 20px;">
               <h2>¡Hola ${cita.nombre}!</h2>
-              <p>Te recordamos que tu cita en <strong>Kajalu Stetic</strong> es <strong>mañana, ${cita.fecha}</strong>.</p>
+              <p>Te recordamos que tu cita en <strong>Kajalu Stetic</strong> es <strong>mañana, ${cita.fecha}${horaTexto}</strong>.</p>
               <p>Si necesitas reprogramar, escríbenos por WhatsApp al 314 539 0510.</p>
               <p>¡Te esperamos!</p>
             </div>
