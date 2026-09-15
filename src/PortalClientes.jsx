@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "./supabaseClient";
-import { Sparkles, LogOut, MessageCircle } from "lucide-react";
+import { Sparkles, LogOut, MessageCircle, Home, Calendar, User, Star, ShoppingBag, Tag, Menu, X } from "lucide-react";
 
 export default function PortalClientes() {
   const [session, setSession] = useState(null);
@@ -48,8 +48,11 @@ export default function PortalClientes() {
   const esAdmin = !!session && ADMIN_EMAILS.includes((session.user.email || "").toLowerCase());
 
   const [mensajeDelDia, setMensajeDelDia] = useState("¡Bienvenida a Kajalu!");
-  const [mostrarEdicionPerfil, setMostrarEdicionPerfil] = useState(false);
-  const perfilCompleto = !!(perfil && perfil.nombre && perfil.telefono);
+  const [vista, setVista] = useState("inicio"); // "inicio" | "citas" | "perfil" | id de una pestaña
+  const [menuAbierto, setMenuAbierto] = useState(false);
+
+  const iconoDePestaña = (tipo) => (tipo === "catalogo" ? ShoppingBag : tipo === "resenas" ? Star : Tag);
+  const irA = (v) => { setVista(v); setMenuAbierto(false); };
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -389,6 +392,35 @@ Si falta la hora, usa "10:00". Si falta la fecha, usa el próximo día hábil.`;
         .p-comprar { display: inline-block; margin-top: 6px; font-size: 12.5px; font-weight: 600; color: white; background: #25D366; padding: 5px 10px; border-radius: 6px; text-decoration: none; }
         .p-admin-form select { font-family: 'Inter', sans-serif; font-size: 13px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); }
         .p-item-img { width: 100%; max-height: 160px; object-fit: cover; border-radius: 8px; margin-bottom: 6px; display: block; }
+
+        /* --- Layout tipo panel para clientas con sesión iniciada --- */
+        .k-app { width: 100%; max-width: 1100px; min-height: 80vh; display: flex; background: var(--bg); border-radius: 14px; overflow: hidden; box-shadow: 0 2px 24px rgba(0,0,0,0.06); }
+        .k-sidebar { width: 220px; flex-shrink: 0; background: var(--surface); border-right: 1px solid var(--line); padding: 24px 0; display: flex; flex-direction: column; }
+        .k-nav { display: flex; flex-direction: column; gap: 2px; margin-top: 18px; flex: 1; }
+        .k-nav-item { display: flex; align-items: center; gap: 10px; text-align: left; background: none; border: none; font-family: 'Inter', sans-serif; font-size: 13.5px; color: var(--ink-soft); padding: 10px 20px; cursor: pointer; }
+        .k-nav-item:hover { background: var(--bg); }
+        .k-nav-activo { background: var(--accent); color: white; font-weight: 600; }
+        .k-menu-toggle { display: none; }
+        .k-main { flex: 1; padding: 28px 30px; overflow-y: auto; }
+        .k-header { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 20px; }
+        .k-header-icon { background: var(--accent-soft); border-radius: 10px; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .k-header h1 { font-family: 'Fraunces', serif; font-size: 21px; margin: 0 0 3px; color: var(--ink); }
+        .k-header p { font-size: 13.5px; color: var(--ink-soft); margin: 0; }
+        .k-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+        .k-card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; cursor: pointer; }
+        .k-card:hover { border-color: var(--accent); }
+        .k-card-titulo { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 14px; color: var(--ink); margin-bottom: 4px; }
+        .k-panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px; margin-top: 16px; }
+        .k-tab-encabezado { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+        @media (max-width: 760px) {
+          .p-root { padding: 0; align-items: stretch; }
+          .k-app { border-radius: 0; min-height: 100vh; }
+          .k-menu-toggle { display: flex; position: fixed; top: 14px; left: 14px; z-index: 1000; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; width: 38px; height: 38px; align-items: center; justify-content: center; cursor: pointer; }
+          .k-sidebar { position: fixed; top: 0; left: -240px; height: 100vh; z-index: 999; transition: left 0.2s ease; padding-top: 60px; }
+          .k-sidebar-abierto { left: 0; }
+          .k-main { padding: 60px 16px 24px; }
+          .k-grid { grid-template-columns: 1fr; }
+        }
       `}</style>
 
       {!session ? (
@@ -444,151 +476,191 @@ Si falta la hora, usa "10:00". Si falta la fecha, usa el próximo día hábil.`;
           )}
         </div>
       ) : (
-        <div className="p-card">
-          <div className="p-logo">Kajalu</div>
-          <div className="p-title">
-            <Sparkles size={16} style={{ verticalAlign: -2 }} /> {mensajeDelDia}
-          </div>
-
-          {mensaje && <div className="p-msg">{mensaje}</div>}
-
-          {(!perfilCompleto || mostrarEdicionPerfil) ? (
-            <>
-              <p className="p-sub">Cuéntanos tus preferencias para darte un servicio hecho a tu medida.</p>
-              <input placeholder="Tu nombre" value={perfilForm.nombre} onChange={(e) => setPerfilForm({ ...perfilForm, nombre: e.target.value })} />
-              <input placeholder="Teléfono" value={perfilForm.telefono} onChange={(e) => setPerfilForm({ ...perfilForm, telefono: e.target.value })} />
-              <textarea className="p-textarea" placeholder="Tus preferencias (ej: tonos, alergias, servicios favoritos...)" value={perfilForm.preferencias} onChange={(e) => setPerfilForm({ ...perfilForm, preferencias: e.target.value })} />
-
-              <button
-                className="p-btn"
-                disabled={guardando}
-                onClick={async () => { await guardarPerfil(); setMostrarEdicionPerfil(false); }}
-              >
-                {guardando ? "Guardando…" : "Guardar mis datos"}
-              </button>
-            </>
-          ) : (
-            <button className="p-link" style={{ marginTop: 0, marginBottom: 6 }} onClick={() => setMostrarEdicionPerfil(true)}>
-              Editar mis datos
-            </button>
-          )}
-
-          <div className="p-title" style={{ fontSize: 16, marginTop: 22 }}>Agenda tu cita</div>
-          <p className="p-sub" style={{ marginBottom: 8 }}>Escríbenos qué servicio quieres y cuándo — la asistente arma tu solicitud.</p>
-          {errorCita && <div className="p-error">{errorCita}</div>}
-          {respuestaCita && <div className="p-msg">{respuestaCita}</div>}
-          <textarea
-            className="p-textarea"
-            placeholder='Ej: "Quiero un masaje relajante el viernes a las 4pm"'
-            value={mensajeCita}
-            onChange={(e) => setMensajeCita(e.target.value)}
-          />
-          <button className="p-btn" disabled={enviandoCita} onClick={enviarSolicitudCita}>
-            {enviandoCita ? "Enviando…" : "Enviar solicitud"}
+        <div className="k-app">
+          <button className="k-menu-toggle" onClick={() => setMenuAbierto(!menuAbierto)}>
+            {menuAbierto ? <X size={20} /> : <Menu size={20} />}
           </button>
 
-          <div className="p-title" style={{ fontSize: 16, marginTop: 22 }}>Explora Kajalu</div>
-          <div className="p-tabs">
-            {contenido.tabs.map((t) => (
-              <button
-                key={t.id}
-                className={`p-tab ${tabActiva === t.id ? "p-tab-activa" : ""}`}
-                onClick={() => setTabActiva(t.id)}
-              >
-                {t.label}
-                {esAdmin && (
-                  <span
-                    className="p-tab-borrar"
-                    onClick={(e) => { e.stopPropagation(); eliminarPestaña(t.id); }}
-                    title="Eliminar pestaña"
-                  > ×</span>
-                )}
+          <aside className={`k-sidebar ${menuAbierto ? "k-sidebar-abierto" : ""}`}>
+            <div className="p-logo" style={{ padding: "0 20px" }}>Kajalu</div>
+            <nav className="k-nav">
+              <button className={`k-nav-item ${vista === "inicio" ? "k-nav-activo" : ""}`} onClick={() => irA("inicio")}>
+                <Home size={17} /> Inicio
               </button>
-            ))}
-            {esAdmin && (
-              <button className="p-tab p-tab-nueva" onClick={() => setMostrandoFormPestaña(!mostrandoFormPestaña)}>
-                + Nueva
+              <button className={`k-nav-item ${vista === "citas" ? "k-nav-activo" : ""}`} onClick={() => irA("citas")}>
+                <Calendar size={17} /> Agendar cita
               </button>
-            )}
-          </div>
-
-          {esAdmin && mostrandoFormPestaña && (
-            <div className="p-admin-form">
-              <input
-                placeholder="Nombre de la pestaña (ej: Videos)"
-                value={nuevaPestañaNombre}
-                onChange={(e) => setNuevaPestañaNombre(e.target.value)}
-              />
-              <select value={nuevaPestañaTipo} onChange={(e) => setNuevaPestañaTipo(e.target.value)}>
-                <option value="info">Normal (solo tú agregas contenido)</option>
-                <option value="catalogo">Catálogo (con botón "Quiero comprarlo")</option>
-                <option value="resenas">Reseñas (las clientas pueden escribir)</option>
-              </select>
-              <button className="p-btn" onClick={agregarPestaña}>Crear pestaña</button>
-            </div>
-          )}
-
-          <div className="p-tab-contenido">
-            {contenido.tabs
-              .find((t) => t.id === tabActiva)
-              ?.items.map((item, i) => {
-                const tabActual = contenido.tabs.find((t) => t.id === tabActiva);
-                const waLink = `https://wa.me/573145390510?text=${encodeURIComponent("Hola, quiero comprar: " + item.titulo)}`;
+              {contenido.tabs.map((t) => {
+                const Icono = iconoDePestaña(t.tipo);
                 return (
-                  <div className="p-item" key={i}>
-                    {item.imagenUrl && <img src={item.imagenUrl} alt={item.titulo} className="p-item-img" />}
-                    <div className="p-item-titulo">{item.titulo}</div>
-                    {item.detalle && <div className="p-item-detalle">{item.detalle}</div>}
-                    {tabActual?.tipo === "catalogo" && (
-                      <a className="p-comprar" href={waLink} target="_blank" rel="noopener noreferrer">
-                        Quiero comprarlo
-                      </a>
-                    )}
-                    {esAdmin && (
-                      <button className="p-item-borrar" onClick={() => eliminarItem(i)}>Eliminar</button>
-                    )}
-                  </div>
+                  <button key={t.id} className={`k-nav-item ${vista === t.id ? "k-nav-activo" : ""}`} onClick={() => irA(t.id)}>
+                    <Icono size={17} /> {t.label}
+                  </button>
                 );
               })}
-            {(!contenido.tabs.find((t) => t.id === tabActiva)?.items.length) && (
-              <p className="p-sub" style={{ margin: 0 }}>Todavía no hay contenido aquí.</p>
-            )}
-          </div>
-
-          {contenido.tabs.find((t) => t.id === tabActiva)?.tipo === "resenas" && (
-            <div className="p-admin-form">
-              <textarea
-                className="p-textarea"
-                placeholder="Cuéntanos cómo fue tu experiencia..."
-                value={textoResena}
-                onChange={(e) => setTextoResena(e.target.value)}
-              />
-              <button className="p-btn" onClick={publicarResena}>Publicar mi reseña</button>
-            </div>
-          )}
-
-          {esAdmin && (
-            <div className="p-admin-form">
-              <input
-                placeholder="Título (ej: Manicure spa — $35.000)"
-                value={nuevoItem.titulo}
-                onChange={(e) => setNuevoItem({ ...nuevoItem, titulo: e.target.value })}
-              />
-              <input
-                placeholder="Detalle (opcional)"
-                value={nuevoItem.detalle}
-                onChange={(e) => setNuevoItem({ ...nuevoItem, detalle: e.target.value })}
-              />
-              <input type="file" accept="image/*" onChange={subirImagen} disabled={subiendoImagen} />
-              {subiendoImagen && <span className="p-sub" style={{ margin: 0 }}>Subiendo foto…</span>}
-              {nuevoItem.imagenUrl && <img src={nuevoItem.imagenUrl} alt="vista previa" className="p-item-img" />}
-              <button className="p-btn" disabled={subiendoImagen} onClick={agregarItem}>
-                Agregar a "{contenido.tabs.find((t) => t.id === tabActiva)?.label}"
+              <button className={`k-nav-item ${vista === "perfil" ? "k-nav-activo" : ""}`} onClick={() => irA("perfil")}>
+                <User size={17} /> Mi perfil
               </button>
-            </div>
-          )}
+            </nav>
+            <button className="p-signout" style={{ margin: "12px 20px" }} onClick={cerrarSesion}>
+              <LogOut size={13} />Cerrar sesión
+            </button>
+          </aside>
 
-          <button className="p-signout" onClick={cerrarSesion}><LogOut size={13} />Cerrar sesión</button>
+          <main className="k-main">
+            <header className="k-header">
+              <div className="k-header-icon"><Sparkles size={20} color="var(--accent)" /></div>
+              <div>
+                <h1>Hola, {perfilForm.nombre || "bienvenida"}</h1>
+                <p>{mensajeDelDia}</p>
+              </div>
+            </header>
+
+            {mensaje && <div className="p-msg">{mensaje}</div>}
+
+            {vista === "inicio" && (
+              <div className="k-grid">
+                <div className="k-card" onClick={() => irA("citas")} role="button">
+                  <div className="k-card-titulo"><Calendar size={16} /> Agenda tu cita</div>
+                  <p className="p-sub" style={{ margin: 0 }}>Escríbenos qué servicio quieres y cuándo.</p>
+                </div>
+                {contenido.tabs.slice(0, 3).map((t) => {
+                  const Icono = iconoDePestaña(t.tipo);
+                  return (
+                    <div className="k-card" key={t.id} onClick={() => irA(t.id)} role="button">
+                      <div className="k-card-titulo"><Icono size={16} /> {t.label}</div>
+                      <p className="p-sub" style={{ margin: 0 }}>
+                        {t.items.length > 0 ? t.items[t.items.length - 1].titulo : "Todavía no hay contenido aquí."}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {vista === "citas" && (
+              <div className="k-panel">
+                <div className="p-title" style={{ fontSize: 16 }}>Agenda tu cita</div>
+                <p className="p-sub" style={{ marginBottom: 8 }}>Escríbenos qué servicio quieres y cuándo — la asistente arma tu solicitud.</p>
+                {errorCita && <div className="p-error">{errorCita}</div>}
+                {respuestaCita && <div className="p-msg">{respuestaCita}</div>}
+                <textarea
+                  className="p-textarea"
+                  placeholder='Ej: "Quiero un masaje relajante el viernes a las 4pm"'
+                  value={mensajeCita}
+                  onChange={(e) => setMensajeCita(e.target.value)}
+                />
+                <button className="p-btn" disabled={enviandoCita} onClick={enviarSolicitudCita}>
+                  {enviandoCita ? "Enviando…" : "Enviar solicitud"}
+                </button>
+              </div>
+            )}
+
+            {vista === "perfil" && (
+              <div className="k-panel">
+                <div className="p-title" style={{ fontSize: 16 }}>Mi perfil</div>
+                <p className="p-sub">Cuéntanos tus preferencias para darte un servicio hecho a tu medida.</p>
+                <input placeholder="Tu nombre" value={perfilForm.nombre} onChange={(e) => setPerfilForm({ ...perfilForm, nombre: e.target.value })} />
+                <input placeholder="Teléfono" value={perfilForm.telefono} onChange={(e) => setPerfilForm({ ...perfilForm, telefono: e.target.value })} />
+                <textarea className="p-textarea" placeholder="Tus preferencias (ej: tonos, alergias, servicios favoritos...)" value={perfilForm.preferencias} onChange={(e) => setPerfilForm({ ...perfilForm, preferencias: e.target.value })} />
+                <button className="p-btn" disabled={guardando} onClick={guardarPerfil}>
+                  {guardando ? "Guardando…" : "Guardar mis datos"}
+                </button>
+              </div>
+            )}
+
+            {contenido.tabs.some((t) => t.id === vista) && (
+              <div className="k-panel">
+                <div className="k-tab-encabezado">
+                  <div className="p-title" style={{ fontSize: 16, margin: 0 }}>
+                    {contenido.tabs.find((t) => t.id === vista)?.label}
+                  </div>
+                  {esAdmin && (
+                    <button className="p-link" style={{ margin: 0, width: "auto" }} onClick={() => eliminarPestaña(vista)}>
+                      Eliminar esta pestaña
+                    </button>
+                  )}
+                </div>
+
+                <div className="k-grid">
+                  {contenido.tabs
+                    .find((t) => t.id === vista)
+                    ?.items.map((item, i) => {
+                      const tabActual = contenido.tabs.find((t) => t.id === vista);
+                      const waLink = `https://wa.me/573145390510?text=${encodeURIComponent("Hola, quiero comprar: " + item.titulo)}`;
+                      return (
+                        <div className="p-item" key={i}>
+                          {item.imagenUrl && <img src={item.imagenUrl} alt={item.titulo} className="p-item-img" />}
+                          <div className="p-item-titulo">{item.titulo}</div>
+                          {item.detalle && <div className="p-item-detalle">{item.detalle}</div>}
+                          {tabActual?.tipo === "catalogo" && (
+                            <a className="p-comprar" href={waLink} target="_blank" rel="noopener noreferrer">
+                              Quiero comprarlo
+                            </a>
+                          )}
+                          {esAdmin && (
+                            <button className="p-item-borrar" onClick={() => eliminarItem(i)}>Eliminar</button>
+                          )}
+                        </div>
+                      );
+                    })}
+                </div>
+                {(!contenido.tabs.find((t) => t.id === vista)?.items.length) && (
+                  <p className="p-sub" style={{ margin: 0 }}>Todavía no hay contenido aquí.</p>
+                )}
+
+                {contenido.tabs.find((t) => t.id === vista)?.tipo === "resenas" && (
+                  <div className="p-admin-form">
+                    <textarea
+                      className="p-textarea"
+                      placeholder="Cuéntanos cómo fue tu experiencia..."
+                      value={textoResena}
+                      onChange={(e) => setTextoResena(e.target.value)}
+                    />
+                    <button className="p-btn" onClick={publicarResena}>Publicar mi reseña</button>
+                  </div>
+                )}
+
+                {esAdmin && (
+                  <div className="p-admin-form">
+                    <input
+                      placeholder="Título (ej: Manicure spa — $35.000)"
+                      value={nuevoItem.titulo}
+                      onChange={(e) => setNuevoItem({ ...nuevoItem, titulo: e.target.value })}
+                    />
+                    <input
+                      placeholder="Detalle (opcional)"
+                      value={nuevoItem.detalle}
+                      onChange={(e) => setNuevoItem({ ...nuevoItem, detalle: e.target.value })}
+                    />
+                    <input type="file" accept="image/*" onChange={subirImagen} disabled={subiendoImagen} />
+                    {subiendoImagen && <span className="p-sub" style={{ margin: 0 }}>Subiendo foto…</span>}
+                    {nuevoItem.imagenUrl && <img src={nuevoItem.imagenUrl} alt="vista previa" className="p-item-img" />}
+                    <button className="p-btn" disabled={subiendoImagen} onClick={agregarItem}>
+                      Agregar a "{contenido.tabs.find((t) => t.id === vista)?.label}"
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {esAdmin && (
+              <div className="k-panel">
+                <div className="p-title" style={{ fontSize: 16 }}>Crear una nueva pestaña</div>
+                <input
+                  placeholder="Nombre de la pestaña (ej: Videos)"
+                  value={nuevaPestañaNombre}
+                  onChange={(e) => setNuevaPestañaNombre(e.target.value)}
+                />
+                <select value={nuevaPestañaTipo} onChange={(e) => setNuevaPestañaTipo(e.target.value)}>
+                  <option value="info">Normal (solo tú agregas contenido)</option>
+                  <option value="catalogo">Catálogo (con botón "Quiero comprarlo")</option>
+                  <option value="resenas">Reseñas (las clientas pueden escribir)</option>
+                </select>
+                <button className="p-btn" onClick={agregarPestaña}>Crear pestaña</button>
+              </div>
+            )}
+          </main>
         </div>
       )}
 
