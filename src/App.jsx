@@ -119,6 +119,27 @@ const seedResenas = [
   { id: uid(), cliente: "Marcela Ríos", calificacion: 4, comentario: "Muy buen servicio, aunque tuve que esperar un poco.", fecha: addDays(todayISO, -15) },
 ];
 
+const CATALOGO_REFERENCIA = [
+  { nombre: "Blower y planchado", categoria: "Cabello" },
+  { nombre: "Tintes", categoria: "Cabello" },
+  { nombre: "Keratina", categoria: "Cabello" },
+  { nombre: "Aminoácidos", categoria: "Cabello" },
+  { nombre: "Hidratación capilar", categoria: "Cabello" },
+  { nombre: "Cubrimiento de canas", categoria: "Cabello" },
+  { nombre: "Pedicure y manicure tradicional", categoria: "Uñas" },
+  { nombre: "Semipermanente en uña natural", categoria: "Uñas" },
+  { nombre: "Press on", categoria: "Uñas" },
+  { nombre: "Despigmentación de zonas oscuras", categoria: "Rostro" },
+  { nombre: "Limpieza facial total", categoria: "Rostro" },
+  { nombre: "Alta frecuencia facial y capilar", categoria: "Rostro" },
+  { nombre: "Depilación con cera", categoria: "Cuerpo" },
+  { nombre: "Masaje relajante completo", categoria: "Masajes" },
+  { nombre: "Masaje descontracturante", categoria: "Masajes" },
+  { nombre: "Drenajes linfáticos", categoria: "Masajes" },
+  { nombre: "Post operatorios manuales", categoria: "Masajes" },
+  { nombre: "Masajes reductores (manta térmica, maderoterapia, gimnasia pasiva)", categoria: "Masajes" },
+];
+
 const seedPautas = [
   { id: uid(), titulo: "Combo de verano: masaje reductor + exfoliación", categoria: "Masajes reductores", texto: "Recupera tu figura para la temporada con nuestro combo especial. Cupos limitados, agenda ya." },
   { id: uid(), titulo: "Manos perfectas para el fin de semana", categoria: "Manicura", texto: "Semipermanente + spa de manos con 15% de descuento reservando entre semana." },
@@ -561,7 +582,7 @@ export default function App() {
         {activeTab === "clientes" && <Clientes clientes={clientes} setClientes={setClientes} citas={citas} />}
         {activeTab === "servicios" && <Servicios servicios={servicios} setServicios={setServicios} />}
         {activeTab === "cotizaciones" && (
-          <Cotizaciones servicios={servicios} clientes={clientes} cotizaciones={cotizaciones} setCotizaciones={setCotizaciones} />
+          <Cotizaciones servicios={servicios} setServicios={setServicios} clientes={clientes} cotizaciones={cotizaciones} setCotizaciones={setCotizaciones} />
         )}
         {activeTab === "catalogo" && (
           <Catalogo
@@ -1215,13 +1236,32 @@ function Tips({ tips, setTips }) {
 
 // ---------- Servicios y precios ----------
 function Servicios({ servicios, setServicios }) {
+  const [servicioElegido, setServicioElegido] = useState("");
   const [form, setForm] = useState({ nombre: "", categoria: "", precio: "", duracion: "" });
+  const esOtro = servicioElegido === "__otro__";
+
+  const elegirDelCatalogo = (valor) => {
+    setServicioElegido(valor);
+    if (valor === "__otro__") {
+      setForm({ nombre: "", categoria: "", precio: "", duracion: "" });
+      return;
+    }
+    const ref = CATALOGO_REFERENCIA.find((c) => c.nombre === valor);
+    setForm({ nombre: valor, categoria: ref ? ref.categoria : "", precio: "", duracion: "" });
+  };
 
   const addServicio = () => {
-    if (!form.nombre.trim()) return;
-    setServicios((ss) => [...ss, { id: uid(), ...form, precio: Number(form.precio) || 0 }]);
+    const nombreFinal = esOtro ? form.nombre.trim() : (servicioElegido || form.nombre.trim());
+    if (!nombreFinal) return;
+    setServicios((ss) => [...ss, { id: uid(), ...form, nombre: nombreFinal, precio: Number(form.precio) || 0 }]);
     setForm({ nombre: "", categoria: "", precio: "", duracion: "" });
+    setServicioElegido("");
   };
+
+  const porCategoriaCatalogo = CATALOGO_REFERENCIA.reduce((acc, s) => {
+    (acc[s.categoria] = acc[s.categoria] || []).push(s);
+    return acc;
+  }, {});
 
   const porCategoria = servicios.reduce((acc, s) => {
     const cat = s.categoria || "Otros";
@@ -1238,7 +1278,18 @@ function Servicios({ servicios, setServicios }) {
       <Card>
         <h3>Agregar servicio</h3>
         <div className="k-form">
-          <input placeholder="Nombre del servicio" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} />
+          <select value={servicioElegido} onChange={(e) => elegirDelCatalogo(e.target.value)}>
+            <option value="" disabled>Selecciona del catálogo</option>
+            {Object.entries(porCategoriaCatalogo).map(([cat, lista]) => (
+              <optgroup label={cat} key={cat}>
+                {lista.map((s) => <option key={s.nombre} value={s.nombre}>{s.nombre}</option>)}
+              </optgroup>
+            ))}
+            <option value="__otro__">Otro (especificar)</option>
+          </select>
+          {esOtro && (
+            <input placeholder="Nombre del servicio nuevo" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} />
+          )}
           <input placeholder="Categoría (ej: Masajes, Uñas...)" value={form.categoria} onChange={(e) => setForm({ ...form, categoria: e.target.value })} />
           <input type="number" placeholder="Precio" value={form.precio} onChange={(e) => setForm({ ...form, precio: e.target.value })} style={{ maxWidth: 110 }} />
           <input placeholder="Duración (ej: 45 min)" value={form.duracion} onChange={(e) => setForm({ ...form, duracion: e.target.value })} style={{ maxWidth: 130 }} />
@@ -1267,31 +1318,110 @@ function Servicios({ servicios, setServicios }) {
 }
 
 // ---------- Cotizaciones ----------
-function Cotizaciones({ servicios, clientes, cotizaciones, setCotizaciones }) {
+
+const PLANTILLAS_WSP = {
+  clasica: {
+    nombre: "Clásica",
+    render: ({ clienteNombre, lineas, subtotal, descuento, total }) => {
+      let t = `Cotización · Kajalu Stetic\n`;
+      if (clienteNombre) t += `Para: ${clienteNombre}\n`;
+      t += `\n${lineas}\n\nSubtotal: ${money(subtotal)}`;
+      if (Number(descuento) > 0) t += `\nDescuento: ${descuento}%\nTotal: ${money(total)}`;
+      t += `\n\n¿Deseas agendar? Escríbenos por WhatsApp al 314 539 0510.`;
+      return t;
+    },
+  },
+  llamativa: {
+    nombre: "Llamativa (con emojis)",
+    render: ({ clienteNombre, lineas, subtotal, descuento, total }) => {
+      let t = `💅✨ *COTIZACIÓN KAJALU STETIC* ✨💅\n`;
+      if (clienteNombre) t += `💌 Especial para: *${clienteNombre}*\n`;
+      t += `\n${lineas}\n`;
+      t += `\n💰 Subtotal: *${money(subtotal)}*`;
+      if (Number(descuento) > 0) t += `\n🎁 Descuento: *${descuento}%*\n💎 Total: *${money(total)}*`;
+      t += `\n\n🌸 ¡Agenda ya! Escríbenos por WhatsApp al 314 539 0510 🌸`;
+      return t;
+    },
+  },
+  elegante: {
+    nombre: "Elegante",
+    render: ({ clienteNombre, lineas, subtotal, descuento, total }) => {
+      let t = `── K A J A L U   S T E T I C ──\n*Cotización de servicios*\n`;
+      if (clienteNombre) t += `\nPreparada para: *${clienteNombre}*`;
+      t += `\n──────────────────────\n${lineas}\n──────────────────────`;
+      t += `\nSubtotal: *${money(subtotal)}*`;
+      if (Number(descuento) > 0) t += `\nDescuento: ${descuento}%\n*Total: ${money(total)}*`;
+      t += `\n\nEscríbenos al 314 539 0510 para agendar.`;
+      return t;
+    },
+  },
+};
+
+function Cotizaciones({ servicios, setServicios, clientes, cotizaciones, setCotizaciones }) {
   const [clienteNombre, setClienteNombre] = useState("");
-  const [seleccionados, setSeleccionados] = useState([]); // ids de servicios elegidos
+  const [items, setItems] = useState([]); // [{id, nombre, precio}] — línea a línea, editable
   const [descuento, setDescuento] = useState(0);
   const [copiado, setCopiado] = useState(false);
+  const [estilo, setEstilo] = useState("llamativa");
 
-  const toggleServicio = (id) => {
-    setSeleccionados((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
-    setCopiado(false);
+  const [servicioElegido, setServicioElegido] = useState("");
+  const [formProducto, setFormProducto] = useState({ nombre: "", precio: "" });
+  const [formNuevoCatalogo, setFormNuevoCatalogo] = useState({ nombre: "", categoria: "" });
+
+  const marcarCambio = () => setCopiado(false);
+
+  // Combina el catálogo fijo de referencia con los servicios que el admin ya haya agregado
+  const catalogoCompleto = useMemo(() => {
+    const nombresExistentes = new Set(servicios.map((s) => s.nombre.toLowerCase()));
+    const extras = servicios.filter((s) => !CATALOGO_REFERENCIA.some((c) => c.nombre.toLowerCase() === s.nombre.toLowerCase()));
+    return [...CATALOGO_REFERENCIA, ...extras.map((s) => ({ nombre: s.nombre, categoria: s.categoria || "Otros" }))];
+  }, [servicios]);
+
+  const porCategoria = catalogoCompleto.reduce((acc, s) => {
+    const cat = s.categoria || "Otros";
+    (acc[cat] = acc[cat] || []).push(s);
+    return acc;
+  }, {});
+
+  const agregarDesdeServicio = () => {
+    if (!servicioElegido) return;
+    const match = servicios.find((s) => s.nombre === servicioElegido);
+    setItems((prev) => [...prev, { id: uid(), nombre: servicioElegido, precio: match ? match.precio : 0 }]);
+    setServicioElegido("");
+    marcarCambio();
   };
 
-  const itemsElegidos = servicios.filter((s) => seleccionados.includes(s.id));
-  const subtotal = itemsElegidos.reduce((s, it) => s + (Number(it.precio) || 0), 0);
-  const totalConDescuento = Math.round(subtotal - (subtotal * (Number(descuento) || 0)) / 100);
+  const agregarProducto = () => {
+    if (!formProducto.nombre.trim()) return;
+    setItems((prev) => [...prev, { id: uid(), nombre: formProducto.nombre.trim(), precio: Number(formProducto.precio) || 0 }]);
+    setFormProducto({ nombre: "", precio: "" });
+    marcarCambio();
+  };
 
+  const agregarAlCatalogo = () => {
+    if (!formNuevoCatalogo.nombre.trim()) return;
+    setServicios((ss) => [...ss, { id: uid(), nombre: formNuevoCatalogo.nombre.trim(), categoria: formNuevoCatalogo.categoria || "Otros", precio: 0, duracion: "" }]);
+    setFormNuevoCatalogo({ nombre: "", categoria: "" });
+  };
+
+  const actualizarItem = (id, campo, valor) => {
+    setItems((prev) => prev.map((it) => (it.id === id ? { ...it, [campo]: campo === "precio" ? valor : valor } : it)));
+    marcarCambio();
+  };
+
+  const eliminarItem = (id) => {
+    setItems((prev) => prev.filter((it) => it.id !== id));
+    marcarCambio();
+  };
+
+  const subtotal = items.reduce((s, it) => s + (Number(it.precio) || 0), 0);
+  const totalConDescuento = Math.round(subtotal - (subtotal * (Number(descuento) || 0)) / 100);
   const clienteInfo = clientes.find((c) => c.nombre === clienteNombre);
 
   const textoCotizacion = () => {
-    const lineas = itemsElegidos.map((it) => `- ${it.nombre}: ${money(it.precio)}`).join("\n");
-    let texto = `Cotización · Kajalu Stetic\n`;
-    if (clienteNombre) texto += `Para: ${clienteNombre}\n`;
-    texto += `\n${lineas || "(sin servicios seleccionados)"}\n\nSubtotal: ${money(subtotal)}`;
-    if (Number(descuento) > 0) texto += `\nDescuento: ${descuento}%\nTotal: ${money(totalConDescuento)}`;
-    texto += `\n\n¿Deseas agendar? Escríbenos por WhatsApp al 314 539 0510.`;
-    return texto;
+    const lineas = items.map((it) => `- ${it.nombre}: ${money(it.precio)}`).join("\n") || "(sin servicios seleccionados)";
+    const plantilla = PLANTILLAS_WSP[estilo] || PLANTILLAS_WSP.clasica;
+    return plantilla.render({ clienteNombre, lineas, subtotal, descuento, total: totalConDescuento || subtotal });
   };
 
   const copiarCotizacion = () => {
@@ -1300,9 +1430,9 @@ function Cotizaciones({ servicios, clientes, cotizaciones, setCotizaciones }) {
   };
 
   const guardarCotizacion = () => {
-    if (itemsElegidos.length === 0) return;
+    if (items.length === 0) return;
     setCotizaciones((prev) => [
-      { id: uid(), cliente: clienteNombre || "Sin nombre", items: itemsElegidos.map((i) => i.nombre), total: totalConDescuento || subtotal, fecha: todayISO },
+      { id: uid(), cliente: clienteNombre || "Sin nombre", items: items.map((i) => i.nombre), total: totalConDescuento || subtotal, fecha: todayISO },
       ...prev,
     ]);
   };
@@ -1313,20 +1443,14 @@ function Cotizaciones({ servicios, clientes, cotizaciones, setCotizaciones }) {
     return digitos.length === 10 ? `57${digitos}` : digitos;
   };
 
-  const porCategoria = servicios.reduce((acc, s) => {
-    const cat = s.categoria || "Otros";
-    (acc[cat] = acc[cat] || []).push(s);
-    return acc;
-  }, {});
-
   return (
     <div>
-      <SectionHeader icon={<Receipt size={18} />} title="Plantilla de cotizaciones" subtitle="Arma una cotización con tus servicios reales y envíasela a la clienta por WhatsApp." />
+      <SectionHeader icon={<Receipt size={18} />} title="Plantilla de cotizaciones" subtitle="Arma una cotización con servicios y productos, y envíasela a la clienta por WhatsApp." />
 
       <Card>
         <h3>1. Elige la clienta (opcional)</h3>
         <div className="k-form">
-          <input list="clientes-cotizacion" placeholder="Nombre de la clienta" value={clienteNombre} onChange={(e) => setClienteNombre(e.target.value)} />
+          <input list="clientes-cotizacion" placeholder="Nombre de la clienta" value={clienteNombre} onChange={(e) => { setClienteNombre(e.target.value); marcarCambio(); }} />
           <datalist id="clientes-cotizacion">
             {clientes.map((c) => <option key={c.id} value={c.nombre} />)}
           </datalist>
@@ -1334,34 +1458,76 @@ function Cotizaciones({ servicios, clientes, cotizaciones, setCotizaciones }) {
       </Card>
 
       <Card>
-        <h3>2. Selecciona los servicios</h3>
-        {Object.keys(porCategoria).length === 0 && <EmptyState text="Primero agrega servicios en 'Servicios y precios'." />}
-        {Object.entries(porCategoria).map(([cat, lista]) => (
-          <div key={cat} style={{ marginBottom: 10 }}>
-            <div style={{ fontWeight: 600, fontSize: 13, color: "var(--ink-soft)", marginBottom: 4 }}>{cat}</div>
-            {lista.map((s) => (
-              <div className="k-list-row" key={s.id}>
-                <div
-                  className={"k-checkbox" + (seleccionados.includes(s.id) ? " checked" : "")}
-                  onClick={() => toggleServicio(s.id)}
-                >
-                  {seleccionados.includes(s.id) && <CheckCircle2 size={12} />}
-                </div>
-                <div className="main" style={{ marginLeft: 10 }}>
-                  <div className="title">{s.nombre}</div>
-                </div>
-                <div style={{ fontWeight: 600 }}>{money(s.precio)}</div>
-              </div>
+        <h3>2. Agrega servicios desde el catálogo</h3>
+        <div className="k-form">
+          <select value={servicioElegido} onChange={(e) => setServicioElegido(e.target.value)}>
+            <option value="" disabled>Selecciona un servicio</option>
+            {Object.entries(porCategoria).map(([cat, lista]) => (
+              <optgroup label={cat} key={cat}>
+                {lista.map((s) => <option key={s.nombre} value={s.nombre}>{s.nombre}</option>)}
+              </optgroup>
             ))}
+          </select>
+          <button className="k-btn" onClick={agregarDesdeServicio}><Plus size={14} />Agregar a la cotización</button>
+        </div>
+
+        <p style={{ fontSize: 12.5, color: "var(--ink-soft)", margin: "10px 0 6px" }}>
+          ¿No está en la lista? Agrégalo al catálogo permanente:
+        </p>
+        <div className="k-form">
+          <input placeholder="Nombre del servicio nuevo" value={formNuevoCatalogo.nombre} onChange={(e) => setFormNuevoCatalogo({ ...formNuevoCatalogo, nombre: e.target.value })} />
+          <input placeholder="Categoría" value={formNuevoCatalogo.categoria} onChange={(e) => setFormNuevoCatalogo({ ...formNuevoCatalogo, categoria: e.target.value })} />
+          <button className="k-btn ghost" onClick={agregarAlCatalogo}><Plus size={14} />Agregar al catálogo</button>
+        </div>
+      </Card>
+
+      <Card>
+        <h3>3. O agrega un producto / ítem suelto</h3>
+        <div className="k-form">
+          <input placeholder="Nombre del producto" value={formProducto.nombre} onChange={(e) => setFormProducto({ ...formProducto, nombre: e.target.value })} />
+          <input type="number" placeholder="Precio" value={formProducto.precio} onChange={(e) => setFormProducto({ ...formProducto, precio: e.target.value })} style={{ maxWidth: 120 }} />
+          <button className="k-btn" onClick={agregarProducto}><Plus size={14} />Agregar producto</button>
+        </div>
+      </Card>
+
+      <Card>
+        <h3>4. Ítems de esta cotización</h3>
+        {items.length === 0 && <EmptyState text="Aún no has agregado servicios ni productos." />}
+        {items.map((it) => (
+          <div className="k-list-row" key={it.id}>
+            <input
+              value={it.nombre}
+              onChange={(e) => actualizarItem(it.id, "nombre", e.target.value)}
+              style={{ flex: 1, fontFamily: "'Inter', sans-serif", fontSize: 13.5, padding: "6px 8px", border: "1px solid var(--line)", borderRadius: 6, background: "var(--bg)", color: "var(--ink)" }}
+            />
+            <input
+              type="number"
+              value={it.precio}
+              onChange={(e) => actualizarItem(it.id, "precio", e.target.value)}
+              style={{ width: 100, fontFamily: "'Inter', sans-serif", fontSize: 13.5, padding: "6px 8px", border: "1px solid var(--line)", borderRadius: 6, background: "var(--bg)", color: "var(--ink)" }}
+            />
+            <IconBtn danger onClick={() => eliminarItem(it.id)}><Trash2 size={14} /></IconBtn>
           </div>
         ))}
       </Card>
 
       <Card>
-        <h3>3. Descuento (opcional)</h3>
+        <h3>5. Descuento (opcional)</h3>
         <div className="k-form">
-          <input type="number" placeholder="% de descuento" value={descuento} onChange={(e) => setDescuento(e.target.value)} style={{ maxWidth: 140 }} />
+          <input type="number" placeholder="% de descuento" value={descuento} onChange={(e) => { setDescuento(e.target.value); marcarCambio(); }} style={{ maxWidth: 140 }} />
         </div>
+      </Card>
+
+      <Card>
+        <h3>6. Estilo del mensaje</h3>
+        <div className="k-form">
+          <select value={estilo} onChange={(e) => { setEstilo(e.target.value); marcarCambio(); }}>
+            {Object.entries(PLANTILLAS_WSP).map(([key, p]) => <option key={key} value={key}>{p.nombre}</option>)}
+          </select>
+        </div>
+        <p style={{ fontSize: 12, color: "var(--ink-soft)", margin: "8px 0 0" }}>
+          WhatsApp no admite fondos de color en el texto — estas plantillas usan negritas y emojis para que se vea llamativo igual.
+        </p>
       </Card>
 
       <Card>
