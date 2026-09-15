@@ -1,6 +1,6 @@
 // api/enviar-recordatorio.js
 // Función serverless de Vercel: se llama justo cuando una clienta agenda una cita,
-// para enviarle la confirmación inmediata por correo.
+// para enviarle el correo de que su solicitud fue recibida (pendiente de confirmar disponibilidad).
 
 import nodemailer from 'nodemailer';
 
@@ -39,18 +39,19 @@ export default async function handler(req, res) {
     await transporter.sendMail({
       from: `"Kajalu Stetic" <${process.env.EMAIL_USER}>`,
       to: destinatario,
-      subject: 'Confirmación de tu cita en Kajalu Stetic',
+      subject: 'Recibimos tu solicitud de cita - Kajalu Stetic',
       html: `
         <div style="font-family: sans-serif; padding: 20px;">
           <h2>¡Hola ${nombreCliente}!</h2>
-          <p>Tu cita en <strong>Kajalu Stetic</strong> quedó agendada para el <strong>${fechaCita}${horaTexto}</strong>.</p>
-          <p>Si necesitas reprogramar, escríbenos por WhatsApp al 314 539 0510.</p>
-          <p>¡Te esperamos!</p>
+          <p>Recibimos tu solicitud de cita en <strong>Kajalu Stetic</strong> para el <strong>${fechaCita}${horaTexto}</strong>.</p>
+          <p>Está <strong>pendiente de confirmar disponibilidad</strong> — te avisaremos muy pronto si queda confirmada.</p>
+          <p>Si necesitas algo más, escríbenos por WhatsApp al 314 539 0510.</p>
+          <p>¡Gracias por tu preferencia!</p>
         </div>
       `,
     });
 
-    return res.status(200).json({ success: true, message: 'Confirmación enviada correctamente' });
+    return res.status(200).json({ success: true, message: 'Correo enviado correctamente' });
   } catch (error) {
     console.error('Error al enviar el correo:', error);
     return res.status(500).json({ error: 'No se pudo enviar el correo' });
