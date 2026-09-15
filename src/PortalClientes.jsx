@@ -39,7 +39,8 @@ export default function PortalClientes() {
   };
   const [contenido, setContenido] = useState(contenidoSemilla);
   const [tabActiva, setTabActiva] = useState("catalogo");
-  const [nuevoItem, setNuevoItem] = useState({ titulo: "", detalle: "" });
+  const [nuevoItem, setNuevoItem] = useState({ titulo: "", detalle: "", imagenUrl: "" });
+  const [subiendoImagen, setSubiendoImagen] = useState(false);
   const [nuevaPestañaNombre, setNuevaPestañaNombre] = useState("");
   const [nuevaPestañaTipo, setNuevaPestañaTipo] = useState("info");
   const [mostrandoFormPestaña, setMostrandoFormPestaña] = useState(false);
@@ -158,13 +159,31 @@ export default function PortalClientes() {
     if (tabActiva === id && nuevasTabs.length > 0) setTabActiva(nuevasTabs[0].id);
   };
 
+  const subirImagen = async (e) => {
+    const archivo = e.target.files[0];
+    if (!archivo) return;
+    setSubiendoImagen(true);
+    try {
+      const nombreArchivo = `${Date.now()}_${archivo.name}`;
+      const { error } = await supabase.storage.from("kajalu-fotos").upload(nombreArchivo, archivo);
+      if (error) throw error;
+      const { data } = supabase.storage.from("kajalu-fotos").getPublicUrl(nombreArchivo);
+      setNuevoItem((prev) => ({ ...prev, imagenUrl: data.publicUrl }));
+    } catch (err) {
+      console.error("Error subiendo la imagen:", err);
+      alert("No se pudo subir la foto. Intenta de nuevo.");
+    } finally {
+      setSubiendoImagen(false);
+    }
+  };
+
   const agregarItem = async () => {
     if (!nuevoItem.titulo.trim()) return;
     const nuevasTabs = contenido.tabs.map((t) =>
       t.id === tabActiva ? { ...t, items: [...t.items, { ...nuevoItem }] } : t
     );
     await guardarContenido({ ...contenido, tabs: nuevasTabs });
-    setNuevoItem({ titulo: "", detalle: "" });
+    setNuevoItem({ titulo: "", detalle: "", imagenUrl: "" });
   };
 
   const eliminarItem = async (index) => {
@@ -369,6 +388,7 @@ Si falta la hora, usa "10:00". Si falta la fecha, usa el próximo día hábil.`;
         .p-item-borrar { align-self: flex-start; background: none; border: none; color: var(--danger); font-size: 11.5px; cursor: pointer; padding: 4px 0 0; }
         .p-comprar { display: inline-block; margin-top: 6px; font-size: 12.5px; font-weight: 600; color: white; background: #25D366; padding: 5px 10px; border-radius: 6px; text-decoration: none; }
         .p-admin-form select { font-family: 'Inter', sans-serif; font-size: 13px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); }
+        .p-item-img { width: 100%; max-height: 160px; object-fit: cover; border-radius: 8px; margin-bottom: 6px; display: block; }
       `}</style>
 
       {!session ? (
@@ -516,6 +536,7 @@ Si falta la hora, usa "10:00". Si falta la fecha, usa el próximo día hábil.`;
                 const waLink = `https://wa.me/573145390510?text=${encodeURIComponent("Hola, quiero comprar: " + item.titulo)}`;
                 return (
                   <div className="p-item" key={i}>
+                    {item.imagenUrl && <img src={item.imagenUrl} alt={item.titulo} className="p-item-img" />}
                     <div className="p-item-titulo">{item.titulo}</div>
                     {item.detalle && <div className="p-item-detalle">{item.detalle}</div>}
                     {tabActual?.tipo === "catalogo" && (
@@ -558,7 +579,12 @@ Si falta la hora, usa "10:00". Si falta la fecha, usa el próximo día hábil.`;
                 value={nuevoItem.detalle}
                 onChange={(e) => setNuevoItem({ ...nuevoItem, detalle: e.target.value })}
               />
-              <button className="p-btn" onClick={agregarItem}>Agregar a "{contenido.tabs.find((t) => t.id === tabActiva)?.label}"</button>
+              <input type="file" accept="image/*" onChange={subirImagen} disabled={subiendoImagen} />
+              {subiendoImagen && <span className="p-sub" style={{ margin: 0 }}>Subiendo foto…</span>}
+              {nuevoItem.imagenUrl && <img src={nuevoItem.imagenUrl} alt="vista previa" className="p-item-img" />}
+              <button className="p-btn" disabled={subiendoImagen} onClick={agregarItem}>
+                Agregar a "{contenido.tabs.find((t) => t.id === tabActiva)?.label}"
+              </button>
             </div>
           )}
 
