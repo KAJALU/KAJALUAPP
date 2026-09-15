@@ -43,6 +43,10 @@ export default function PortalClientes() {
   const [mostrandoFormPestaña, setMostrandoFormPestaña] = useState(false);
   const esAdmin = !!session && ADMIN_EMAILS.includes((session.user.email || "").toLowerCase());
 
+  const [mensajeDelDia, setMensajeDelDia] = useState("¡Bienvenida a Kajalu!");
+  const [mostrarEdicionPerfil, setMostrarEdicionPerfil] = useState(false);
+  const perfilCompleto = !!(perfil && perfil.nombre && perfil.telefono);
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
@@ -81,6 +85,35 @@ export default function PortalClientes() {
       if (contenidoGuardado && contenidoGuardado.tabs && contenidoGuardado.tabs.length > 0) {
         setContenido(contenidoGuardado);
         setTabActiva(contenidoGuardado.tabs[0].id);
+      }
+
+      const hoy = new Date().toISOString().slice(0, 10);
+      const mensajeGuardado = fila?.data?.mensajeDia;
+      if (mensajeGuardado && mensajeGuardado.fecha === hoy) {
+        setMensajeDelDia(mensajeGuardado.texto);
+        return;
+      }
+
+      // Todavía no hay mensaje generado hoy: se lo pedimos a la IA y lo guardamos para todas
+      try {
+        const prompt = `Eres la asistente de Kajalu Stetic, un centro de belleza. Escribe un único mensaje de bienvenida corto (máximo 18 palabras), cálido y variado, para las clientas que abren la app hoy. Puede ser un tip de belleza, autocuidado, o una frase motivadora. Responde SOLO con el mensaje, sin comillas ni texto adicional.`;
+        const res = await fetch("/api/ia", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt }),
+        });
+        const data = await res.json();
+        const texto = (data.text || "").trim().replace(/^"|"$/g, "") || "Hoy es un buen día para consentirte un poco.";
+        setMensajeDelDia(texto);
+
+        const actual = fila?.data || {};
+        await supabase.from("app_data").upsert({
+          id: "main",
+          data: { ...actual, mensajeDia: { fecha: hoy, texto } },
+          updated_at: new Date().toISOString(),
+        });
+      } catch (e) {
+        setMensajeDelDia("Hoy es un buen día para consentirte un poco.");
       }
     })();
   }, [session]);
@@ -182,6 +215,7 @@ export default function PortalClientes() {
   const guardarPerfil = async () => {
     setGuardando(true);
     await supabase.from("perfiles_clientes").update(perfilForm).eq("id", session.user.id);
+    setPerfil({ ...(perfil || {}), ...perfilForm });
     setGuardando(false);
     setMensaje("Datos actualizados. ¡Gracias por contarnos más sobre ti!");
   };
@@ -376,18 +410,32 @@ Si falta la hora, usa "10:00". Si falta la fecha, usa el próximo día hábil.`;
       ) : (
         <div className="p-card">
           <div className="p-logo">Kajalu</div>
-          <div className="p-title">Hola, {perfilForm.nombre || "bienvenida"} <Sparkles size={16} style={{ verticalAlign: -2 }} /></div>
-          <p className="p-sub">Cuéntanos tus preferencias para darte un servicio hecho a tu medida.</p>
+          <div className="p-title">
+            <Sparkles size={16} style={{ verticalAlign: -2 }} /> {mensajeDelDia}
+          </div>
 
           {mensaje && <div className="p-msg">{mensaje}</div>}
 
-          <input placeholder="Tu nombre" value={perfilForm.nombre} onChange={(e) => setPerfilForm({ ...perfilForm, nombre: e.target.value })} />
-          <input placeholder="Teléfono" value={perfilForm.telefono} onChange={(e) => setPerfilForm({ ...perfilForm, telefono: e.target.value })} />
-          <textarea className="p-textarea" placeholder="Tus preferencias (ej: tonos, alergias, servicios favoritos...)" value={perfilForm.preferencias} onChange={(e) => setPerfilForm({ ...perfilForm, preferencias: e.target.value })} />
+          {(!perfilCompleto || mostrarEdicionPerfil) ? (
+            <>
+              <p className="p-sub">Cuéntanos tus preferencias para darte un servicio hecho a tu medida.</p>
+              <input placeholder="Tu nombre" value={perfilForm.nombre} onChange={(e) => setPerfilForm({ ...perfilForm, nombre: e.target.value })} />
+              <input placeholder="Teléfono" value={perfilForm.telefono} onChange={(e) => setPerfilForm({ ...perfilForm, telefono: e.target.value })} />
+              <textarea className="p-textarea" placeholder="Tus preferencias (ej: tonos, alergias, servicios favoritos...)" value={perfilForm.preferencias} onChange={(e) => setPerfilForm({ ...perfilForm, preferencias: e.target.value })} />
 
-          <button className="p-btn" disabled={guardando} onClick={guardarPerfil}>
-            {guardando ? "Guardando…" : "Guardar mis datos"}
-          </button>
+              <button
+                className="p-btn"
+                disabled={guardando}
+                onClick={async () => { await guardarPerfil(); setMostrarEdicionPerfil(false); }}
+              >
+                {guardando ? "Guardando…" : "Guardar mis datos"}
+              </button>
+            </>
+          ) : (
+            <button className="p-link" style={{ marginTop: 0, marginBottom: 6 }} onClick={() => setMostrarEdicionPerfil(true)}>
+              Editar mis datos
+            </button>
+          )}
 
           <div className="p-title" style={{ fontSize: 16, marginTop: 22 }}>Agenda tu cita</div>
           <p className="p-sub" style={{ marginBottom: 8 }}>Escríbenos qué servicio quieres y cuándo — la asistente arma tu solicitud.</p>
