@@ -24,23 +24,26 @@ export default function PortalClientes() {
   const ADMIN_EMAILS = ["kajaluapp@gmail.com"];
   const contenidoSemilla = {
     tabs: [
-      { id: "catalogo", label: "Catálogo", items: [
+      { id: "catalogo", label: "Catálogo", tipo: "catalogo", items: [
         { titulo: "Manicure spa — $35.000", detalle: "Limado, cutícula, hidratación y esmaltado." },
         { titulo: "Pestañas pelo a pelo — $60.000", detalle: "Efecto natural, duración de 3 semanas." },
       ]},
-      { id: "promociones", label: "Promociones", items: [
+      { id: "promociones", label: "Promociones", tipo: "info", items: [
         { titulo: "2x1 en manicure", detalle: "Válido de lunes a miércoles, agenda con una amiga." },
       ]},
-      { id: "tips", label: "Tips", items: [
+      { id: "tips", label: "Tips", tipo: "info", items: [
         { titulo: "Cuida tu esmaltado", detalle: "Usa guantes al lavar loza para que dure más tiempo." },
       ]},
+      { id: "resenas", label: "Reseñas", tipo: "resenas", items: [] },
     ],
   };
   const [contenido, setContenido] = useState(contenidoSemilla);
   const [tabActiva, setTabActiva] = useState("catalogo");
   const [nuevoItem, setNuevoItem] = useState({ titulo: "", detalle: "" });
   const [nuevaPestañaNombre, setNuevaPestañaNombre] = useState("");
+  const [nuevaPestañaTipo, setNuevaPestañaTipo] = useState("info");
   const [mostrandoFormPestaña, setMostrandoFormPestaña] = useState(false);
+  const [textoResena, setTextoResena] = useState("");
   const esAdmin = !!session && ADMIN_EMAILS.includes((session.user.email || "").toLowerCase());
 
   const [mensajeDelDia, setMensajeDelDia] = useState("¡Bienvenida a Kajalu!");
@@ -129,12 +132,23 @@ export default function PortalClientes() {
   const agregarPestaña = async () => {
     if (!nuevaPestañaNombre.trim()) return;
     const id = nuevaPestañaNombre.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9\-]/g, "");
-    const nuevaTab = { id, label: nuevaPestañaNombre.trim(), items: [] };
+    const nuevaTab = { id, label: nuevaPestañaNombre.trim(), tipo: nuevaPestañaTipo, items: [] };
     const nuevoContenido = { ...contenido, tabs: [...contenido.tabs, nuevaTab] };
     await guardarContenido(nuevoContenido);
     setTabActiva(id);
     setNuevaPestañaNombre("");
+    setNuevaPestañaTipo("info");
     setMostrandoFormPestaña(false);
+  };
+
+  const publicarResena = async () => {
+    if (!textoResena.trim()) return;
+    const item = { titulo: perfilForm.nombre || session.user.email, detalle: textoResena.trim() };
+    const nuevasTabs = contenido.tabs.map((t) =>
+      t.id === tabActiva ? { ...t, items: [...t.items, item] } : t
+    );
+    await guardarContenido({ ...contenido, tabs: nuevasTabs });
+    setTextoResena("");
   };
 
   const eliminarPestaña = async (id) => {
@@ -353,6 +367,8 @@ Si falta la hora, usa "10:00". Si falta la fecha, usa el próximo día hábil.`;
         .p-tab-nueva { border-style: dashed; }
         .p-admin-form { display: flex; flex-direction: column; gap: 6px; border: 1px dashed var(--line); border-radius: 10px; padding: 10px; margin-bottom: 10px; background: var(--accent-soft); }
         .p-item-borrar { align-self: flex-start; background: none; border: none; color: var(--danger); font-size: 11.5px; cursor: pointer; padding: 4px 0 0; }
+        .p-comprar { display: inline-block; margin-top: 6px; font-size: 12.5px; font-weight: 600; color: white; background: #25D366; padding: 5px 10px; border-radius: 6px; text-decoration: none; }
+        .p-admin-form select { font-family: 'Inter', sans-serif; font-size: 13px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); }
       `}</style>
 
       {!session ? (
@@ -483,6 +499,11 @@ Si falta la hora, usa "10:00". Si falta la fecha, usa el próximo día hábil.`;
                 value={nuevaPestañaNombre}
                 onChange={(e) => setNuevaPestañaNombre(e.target.value)}
               />
+              <select value={nuevaPestañaTipo} onChange={(e) => setNuevaPestañaTipo(e.target.value)}>
+                <option value="info">Normal (solo tú agregas contenido)</option>
+                <option value="catalogo">Catálogo (con botón "Quiero comprarlo")</option>
+                <option value="resenas">Reseñas (las clientas pueden escribir)</option>
+              </select>
               <button className="p-btn" onClick={agregarPestaña}>Crear pestaña</button>
             </div>
           )}
@@ -490,19 +511,40 @@ Si falta la hora, usa "10:00". Si falta la fecha, usa el próximo día hábil.`;
           <div className="p-tab-contenido">
             {contenido.tabs
               .find((t) => t.id === tabActiva)
-              ?.items.map((item, i) => (
-                <div className="p-item" key={i}>
-                  <div className="p-item-titulo">{item.titulo}</div>
-                  {item.detalle && <div className="p-item-detalle">{item.detalle}</div>}
-                  {esAdmin && (
-                    <button className="p-item-borrar" onClick={() => eliminarItem(i)}>Eliminar</button>
-                  )}
-                </div>
-              ))}
+              ?.items.map((item, i) => {
+                const tabActual = contenido.tabs.find((t) => t.id === tabActiva);
+                const waLink = `https://wa.me/573145390510?text=${encodeURIComponent("Hola, quiero comprar: " + item.titulo)}`;
+                return (
+                  <div className="p-item" key={i}>
+                    <div className="p-item-titulo">{item.titulo}</div>
+                    {item.detalle && <div className="p-item-detalle">{item.detalle}</div>}
+                    {tabActual?.tipo === "catalogo" && (
+                      <a className="p-comprar" href={waLink} target="_blank" rel="noopener noreferrer">
+                        Quiero comprarlo
+                      </a>
+                    )}
+                    {esAdmin && (
+                      <button className="p-item-borrar" onClick={() => eliminarItem(i)}>Eliminar</button>
+                    )}
+                  </div>
+                );
+              })}
             {(!contenido.tabs.find((t) => t.id === tabActiva)?.items.length) && (
               <p className="p-sub" style={{ margin: 0 }}>Todavía no hay contenido aquí.</p>
             )}
           </div>
+
+          {contenido.tabs.find((t) => t.id === tabActiva)?.tipo === "resenas" && (
+            <div className="p-admin-form">
+              <textarea
+                className="p-textarea"
+                placeholder="Cuéntanos cómo fue tu experiencia..."
+                value={textoResena}
+                onChange={(e) => setTextoResena(e.target.value)}
+              />
+              <button className="p-btn" onClick={publicarResena}>Publicar mi reseña</button>
+            </div>
+          )}
 
           {esAdmin && (
             <div className="p-admin-form">
