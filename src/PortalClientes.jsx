@@ -20,6 +20,29 @@ export default function PortalClientes() {
   const [respuestaCita, setRespuestaCita] = useState("");
   const [errorCita, setErrorCita] = useState("");
 
+  // --- Contenido editable del portal (catálogo, promociones, tips, etc.) ---
+  const ADMIN_EMAILS = ["kajaluapp@gmail.com"];
+  const contenidoSemilla = {
+    tabs: [
+      { id: "catalogo", label: "Catálogo", items: [
+        { titulo: "Manicure spa — $35.000", detalle: "Limado, cutícula, hidratación y esmaltado." },
+        { titulo: "Pestañas pelo a pelo — $60.000", detalle: "Efecto natural, duración de 3 semanas." },
+      ]},
+      { id: "promociones", label: "Promociones", items: [
+        { titulo: "2x1 en manicure", detalle: "Válido de lunes a miércoles, agenda con una amiga." },
+      ]},
+      { id: "tips", label: "Tips", items: [
+        { titulo: "Cuida tu esmaltado", detalle: "Usa guantes al lavar loza para que dure más tiempo." },
+      ]},
+    ],
+  };
+  const [contenido, setContenido] = useState(contenidoSemilla);
+  const [tabActiva, setTabActiva] = useState("catalogo");
+  const [nuevoItem, setNuevoItem] = useState({ titulo: "", detalle: "" });
+  const [nuevaPestañaNombre, setNuevaPestañaNombre] = useState("");
+  const [mostrandoFormPestaña, setMostrandoFormPestaña] = useState(false);
+  const esAdmin = !!session && ADMIN_EMAILS.includes((session.user.email || "").toLowerCase());
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
@@ -45,6 +68,64 @@ export default function PortalClientes() {
       }
     })();
   }, [session]);
+
+  useEffect(() => {
+    if (!session) return;
+    (async () => {
+      const { data: fila } = await supabase
+        .from("app_data")
+        .select("data")
+        .eq("id", "main")
+        .maybeSingle();
+      const contenidoGuardado = fila?.data?.contenido;
+      if (contenidoGuardado && contenidoGuardado.tabs && contenidoGuardado.tabs.length > 0) {
+        setContenido(contenidoGuardado);
+        setTabActiva(contenidoGuardado.tabs[0].id);
+      }
+    })();
+  }, [session]);
+
+  const guardarContenido = async (nuevoContenido) => {
+    const { data: fila } = await supabase.from("app_data").select("data").eq("id", "main").maybeSingle();
+    const actual = fila?.data || {};
+    const nuevaData = { ...actual, contenido: nuevoContenido };
+    await supabase.from("app_data").upsert({ id: "main", data: nuevaData, updated_at: new Date().toISOString() });
+    setContenido(nuevoContenido);
+  };
+
+  const agregarPestaña = async () => {
+    if (!nuevaPestañaNombre.trim()) return;
+    const id = nuevaPestañaNombre.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9\-]/g, "");
+    const nuevaTab = { id, label: nuevaPestañaNombre.trim(), items: [] };
+    const nuevoContenido = { ...contenido, tabs: [...contenido.tabs, nuevaTab] };
+    await guardarContenido(nuevoContenido);
+    setTabActiva(id);
+    setNuevaPestañaNombre("");
+    setMostrandoFormPestaña(false);
+  };
+
+  const eliminarPestaña = async (id) => {
+    const nuevasTabs = contenido.tabs.filter((t) => t.id !== id);
+    const nuevoContenido = { ...contenido, tabs: nuevasTabs };
+    await guardarContenido(nuevoContenido);
+    if (tabActiva === id && nuevasTabs.length > 0) setTabActiva(nuevasTabs[0].id);
+  };
+
+  const agregarItem = async () => {
+    if (!nuevoItem.titulo.trim()) return;
+    const nuevasTabs = contenido.tabs.map((t) =>
+      t.id === tabActiva ? { ...t, items: [...t.items, { ...nuevoItem }] } : t
+    );
+    await guardarContenido({ ...contenido, tabs: nuevasTabs });
+    setNuevoItem({ titulo: "", detalle: "" });
+  };
+
+  const eliminarItem = async (index) => {
+    const nuevasTabs = contenido.tabs.map((t) =>
+      t.id === tabActiva ? { ...t, items: t.items.filter((_, i) => i !== index) } : t
+    );
+    await guardarContenido({ ...contenido, tabs: nuevasTabs });
+  };
 
   const contraseñaValida = (clave) =>
     /^(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>_\-]).{6,}$/.test(clave);
@@ -213,7 +294,7 @@ Si falta la hora, usa "10:00". Si falta la fecha, usa el próximo día hábil.`;
           display: flex; align-items: center; justify-content: center; padding: 24px;
         }
         .p-root * { box-sizing: border-box; }
-        .p-card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 32px; width: 100%; max-width: 380px; }
+        .p-card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 32px; width: 100%; max-width: 420px; }
         .p-logo { font-family: 'Fraunces', serif; font-style: italic; font-size: 28px; color: var(--accent); margin-bottom: 4px; }
         .p-sub { color: var(--ink-soft); font-size: 13.5px; margin-bottom: 22px; }
         .p-root input { width: 100%; font-family: 'Inter', sans-serif; font-size: 14px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); margin-bottom: 10px; }
@@ -226,6 +307,18 @@ Si falta la hora, usa "10:00". Si falta la fecha, usa el próximo día hábil.`;
         .p-title { font-family: 'Fraunces', serif; font-size: 20px; margin-bottom: 4px; }
         .p-signout { display: flex; align-items: center; gap: 6px; background: none; border: none; color: var(--ink-soft); font-size: 12.5px; cursor: pointer; margin-top: 18px; }
         textarea.p-textarea { width: 100%; font-family: 'Inter', sans-serif; font-size: 13.5px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); resize: vertical; min-height: 70px; margin-bottom: 10px; }
+        .p-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 12px; }
+        .p-tab { font-family: 'Inter', sans-serif; font-size: 12.5px; padding: 6px 10px; border-radius: 20px; border: 1px solid var(--line); background: var(--bg); color: var(--ink-soft); cursor: pointer; }
+        .p-tab-activa { background: var(--accent); color: white; border-color: var(--accent); }
+        .p-tab-contenido { max-height: 220px; overflow-y: auto; margin-bottom: 6px; }
+        .p-item { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; background: var(--bg); }
+        .p-item-titulo { font-weight: 600; font-size: 13.5px; color: var(--ink); text-decoration: none; display: block; }
+        .p-item-detalle { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+        .p-tab-borrar { margin-left: 6px; opacity: 0.7; }
+        .p-tab-borrar:hover { opacity: 1; }
+        .p-tab-nueva { border-style: dashed; }
+        .p-admin-form { display: flex; flex-direction: column; gap: 6px; border: 1px dashed var(--line); border-radius: 10px; padding: 10px; margin-bottom: 10px; background: var(--accent-soft); }
+        .p-item-borrar { align-self: flex-start; background: none; border: none; color: var(--danger); font-size: 11.5px; cursor: pointer; padding: 4px 0 0; }
       `}</style>
 
       {!session ? (
@@ -309,6 +402,75 @@ Si falta la hora, usa "10:00". Si falta la fecha, usa el próximo día hábil.`;
           <button className="p-btn" disabled={enviandoCita} onClick={enviarSolicitudCita}>
             {enviandoCita ? "Enviando…" : "Enviar solicitud"}
           </button>
+
+          <div className="p-title" style={{ fontSize: 16, marginTop: 22 }}>Explora Kajalu</div>
+          <div className="p-tabs">
+            {contenido.tabs.map((t) => (
+              <button
+                key={t.id}
+                className={`p-tab ${tabActiva === t.id ? "p-tab-activa" : ""}`}
+                onClick={() => setTabActiva(t.id)}
+              >
+                {t.label}
+                {esAdmin && (
+                  <span
+                    className="p-tab-borrar"
+                    onClick={(e) => { e.stopPropagation(); eliminarPestaña(t.id); }}
+                    title="Eliminar pestaña"
+                  > ×</span>
+                )}
+              </button>
+            ))}
+            {esAdmin && (
+              <button className="p-tab p-tab-nueva" onClick={() => setMostrandoFormPestaña(!mostrandoFormPestaña)}>
+                + Nueva
+              </button>
+            )}
+          </div>
+
+          {esAdmin && mostrandoFormPestaña && (
+            <div className="p-admin-form">
+              <input
+                placeholder="Nombre de la pestaña (ej: Videos)"
+                value={nuevaPestañaNombre}
+                onChange={(e) => setNuevaPestañaNombre(e.target.value)}
+              />
+              <button className="p-btn" onClick={agregarPestaña}>Crear pestaña</button>
+            </div>
+          )}
+
+          <div className="p-tab-contenido">
+            {contenido.tabs
+              .find((t) => t.id === tabActiva)
+              ?.items.map((item, i) => (
+                <div className="p-item" key={i}>
+                  <div className="p-item-titulo">{item.titulo}</div>
+                  {item.detalle && <div className="p-item-detalle">{item.detalle}</div>}
+                  {esAdmin && (
+                    <button className="p-item-borrar" onClick={() => eliminarItem(i)}>Eliminar</button>
+                  )}
+                </div>
+              ))}
+            {(!contenido.tabs.find((t) => t.id === tabActiva)?.items.length) && (
+              <p className="p-sub" style={{ margin: 0 }}>Todavía no hay contenido aquí.</p>
+            )}
+          </div>
+
+          {esAdmin && (
+            <div className="p-admin-form">
+              <input
+                placeholder="Título (ej: Manicure spa — $35.000)"
+                value={nuevoItem.titulo}
+                onChange={(e) => setNuevoItem({ ...nuevoItem, titulo: e.target.value })}
+              />
+              <input
+                placeholder="Detalle (opcional)"
+                value={nuevoItem.detalle}
+                onChange={(e) => setNuevoItem({ ...nuevoItem, detalle: e.target.value })}
+              />
+              <button className="p-btn" onClick={agregarItem}>Agregar a "{contenido.tabs.find((t) => t.id === tabActiva)?.label}"</button>
+            </div>
+          )}
 
           <button className="p-signout" onClick={cerrarSesion}><LogOut size={13} />Cerrar sesión</button>
         </div>
