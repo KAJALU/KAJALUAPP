@@ -1358,7 +1358,15 @@ const PLANTILLAS_WSP = {
 };
 
 function Cotizaciones({ servicios, setServicios, clientes, cotizaciones, setCotizaciones }) {
+  const [clienteSeleccionado, setClienteSeleccionado] = useState("");
   const [clienteNombre, setClienteNombre] = useState("");
+  const esClienteNueva = clienteSeleccionado === "__nueva__";
+
+  const elegirCliente = (valor) => {
+    setClienteSeleccionado(valor);
+    setClienteNombre(valor === "__nueva__" ? "" : valor);
+    setCopiado(false);
+  };
   const [items, setItems] = useState([]); // [{id, nombre, precio}] — línea a línea, editable
   const [descuento, setDescuento] = useState(0);
   const [copiado, setCopiado] = useState(false);
@@ -1448,13 +1456,26 @@ function Cotizaciones({ servicios, setServicios, clientes, cotizaciones, setCoti
       <SectionHeader icon={<Receipt size={18} />} title="Plantilla de cotizaciones" subtitle="Arma una cotización con servicios y productos, y envíasela a la clienta por WhatsApp." />
 
       <Card>
-        <h3>1. Elige la clienta (opcional)</h3>
+        <h3>1. Elige la clienta</h3>
         <div className="k-form">
-          <input list="clientes-cotizacion" placeholder="Nombre de la clienta" value={clienteNombre} onChange={(e) => { setClienteNombre(e.target.value); marcarCambio(); }} />
-          <datalist id="clientes-cotizacion">
-            {clientes.map((c) => <option key={c.id} value={c.nombre} />)}
-          </datalist>
+          <select value={clienteSeleccionado} onChange={(e) => elegirCliente(e.target.value)}>
+            <option value="" disabled>Selecciona una clienta</option>
+            {clientes.map((c) => (
+              <option key={c.id} value={c.nombre}>{c.nombre}{c.telefono ? ` · ${c.telefono}` : ""}</option>
+            ))}
+            <option value="__nueva__">Otra / clienta nueva (escribir nombre)</option>
+          </select>
+          {esClienteNueva && (
+            <input placeholder="Nombre de la clienta" value={clienteNombre} onChange={(e) => { setClienteNombre(e.target.value); marcarCambio(); }} />
+          )}
         </div>
+        {clienteSeleccionado && !esClienteNueva && (
+          <p style={{ fontSize: 12.5, color: "var(--ink-soft)", margin: "8px 0 0" }}>
+            {clientes.find((c) => c.nombre === clienteSeleccionado)?.telefono
+              ? "Con esta clienta ya puedes enviar la cotización directo por WhatsApp más abajo."
+              : "Esta clienta no tiene teléfono guardado — agrégalo en \"Clientes\" para poder enviarle por WhatsApp."}
+          </p>
+        )}
       </Card>
 
       <Card>
