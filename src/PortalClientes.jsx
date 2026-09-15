@@ -136,9 +136,12 @@ Si falta la hora, usa "10:00". Si falta la fecha, usa el próximo día hábil.`;
 
       const actual = fila?.data || {};
       const citasActuales = actual.citas || [];
+      const nombreCliente = perfilForm.nombre || session.user.email;
+      const correoCliente = session.user.email;
+
       const nuevaCita = {
         id: Math.random().toString(36).slice(2, 9),
-        cliente: perfilForm.nombre || session.user.email,
+        cliente: nombreCliente,
         servicio: parsed.servicio,
         fecha: parsed.fecha,
         hora: parsed.hora,
@@ -151,6 +154,30 @@ Si falta la hora, usa "10:00". Si falta la fecha, usa el próximo día hábil.`;
         .from("app_data")
         .upsert({ id: "main", data: nuevaData, updated_at: new Date().toISOString() });
       if (errGuardar) throw errGuardar;
+
+      // Guardar también en la tabla "citas" para que el recordatorio del día anterior la encuentre
+      await supabase.from("citas").insert({
+        nombre: nombreCliente,
+        correo: correoCliente,
+        fecha: parsed.fecha,
+        hora: parsed.hora,
+      });
+
+      // Enviar el correo de confirmación inmediata (si falla, no interrumpe el flujo de la clienta)
+      try {
+        await fetch("/api/enviar-recordatorio", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            destinatario: correoCliente,
+            nombreCliente: nombreCliente,
+            fechaCita: parsed.fecha,
+            horaCita: parsed.hora,
+          }),
+        });
+      } catch (errCorreo) {
+        console.error("No se pudo enviar el correo de confirmación:", errCorreo);
+      }
 
       setRespuestaCita(parsed.respuesta || "¡Listo! Tu solicitud fue enviada, te confirmaremos pronto.");
       setMensajeCita("");
