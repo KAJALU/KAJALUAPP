@@ -46,7 +46,9 @@ export default function PortalClientes() {
   const [mostrandoFormPestaña, setMostrandoFormPestaña] = useState(false);
   const [textoResena, setTextoResena] = useState("");
   const [servicios, setServicios] = useState([]);
-  const esAdmin = !!session && ADMIN_EMAILS.includes((session.user.email || "").toLowerCase());
+  // La administración del contenido (agregar/quitar pestañas, fotos, etc.) ahora se hace
+  // exclusivamente desde el panel de administrador (App.jsx) — aquí el portal es solo para clientas.
+  const esAdmin = false;
 
   const [mensajeDelDia, setMensajeDelDia] = useState("¡Bienvenida a Kajalu!");
   const [vista, setVista] = useState("inicio"); // "inicio" | "citas" | "perfil" | id de una pestaña
