@@ -206,6 +206,20 @@ export default function App() {
     await supabase.auth.signOut();
   };
 
+  const [loginModo, setLoginModo] = useState("login"); // "login" | "recuperar"
+  const [loginMensaje, setLoginMensaje] = useState("");
+
+  const recuperarClaveAdmin = async () => {
+    if (!loginForm.correo.trim()) { setLoginError("Escribe tu correo para poder enviarte el enlace."); return; }
+    setLoginError(""); setLoginMensaje(""); setLoginCargando(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(loginForm.correo, {
+      redirectTo: window.location.origin,
+    });
+    setLoginCargando(false);
+    if (error) setLoginError(error.message);
+    else setLoginMensaje("Te enviamos un correo con un enlace para crear una nueva contraseña.");
+  };
+
   const [activeTab, setActiveTab] = useState("inicio");
 
   const [clientes, setClientes] = useState(seedClientes);
@@ -386,8 +400,11 @@ export default function App() {
     return (
       <div style={estiloCajaLogin}>
         <div style={{ fontFamily: "'Fraunces', serif", fontStyle: "italic", fontSize: 26, color: "#9C3D57" }}>Kajalu — Admin</div>
-        <p style={{ color: "#7A6870", margin: 0, textAlign: "center" }}>Inicia sesión para entrar al panel de administrador.</p>
+        <p style={{ color: "#7A6870", margin: 0, textAlign: "center" }}>
+          {loginModo === "login" ? "Inicia sesión para entrar al panel de administrador." : "Escribe tu correo y te enviaremos un enlace para crear una nueva contraseña."}
+        </p>
         {loginError && <div style={{ color: "#B8503F", fontSize: 13 }}>{loginError}</div>}
+        {loginMensaje && <div style={{ color: "#4F7A5A", fontSize: 13 }}>{loginMensaje}</div>}
         <input
           style={estiloInputLogin}
           type="email"
@@ -395,15 +412,27 @@ export default function App() {
           value={loginForm.correo}
           onChange={(e) => setLoginForm({ ...loginForm, correo: e.target.value })}
         />
-        <input
-          style={estiloInputLogin}
-          type="password"
-          placeholder="Contraseña"
-          value={loginForm.clave}
-          onChange={(e) => setLoginForm({ ...loginForm, clave: e.target.value })}
-        />
-        <button style={estiloBotonLogin} disabled={loginCargando} onClick={iniciarSesionAdmin}>
-          {loginCargando ? "Un momento…" : "Iniciar sesión"}
+        {loginModo === "login" && (
+          <input
+            style={estiloInputLogin}
+            type="password"
+            placeholder="Contraseña"
+            value={loginForm.clave}
+            onChange={(e) => setLoginForm({ ...loginForm, clave: e.target.value })}
+          />
+        )}
+        <button
+          style={estiloBotonLogin}
+          disabled={loginCargando}
+          onClick={loginModo === "login" ? iniciarSesionAdmin : recuperarClaveAdmin}
+        >
+          {loginCargando ? "Un momento…" : loginModo === "login" ? "Iniciar sesión" : "Enviar enlace"}
+        </button>
+        <button
+          style={{ background: "none", border: "none", color: "#9C3D57", fontSize: 13, cursor: "pointer" }}
+          onClick={() => { setLoginModo(loginModo === "login" ? "recuperar" : "login"); setLoginError(""); setLoginMensaje(""); }}
+        >
+          {loginModo === "login" ? "¿Olvidaste tu contraseña?" : "Volver a iniciar sesión"}
         </button>
       </div>
     );
