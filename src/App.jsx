@@ -4,7 +4,7 @@ import {
   Home, CalendarCheck, Users, Package, Wallet, CheckSquare, BellRing,
   MessageCircle, Sparkles, Plus, Trash2, Phone, AlertTriangle,
   TrendingUp, TrendingDown, ShoppingCart, ChevronRight, Sun,
-  Tag, Star, Megaphone, Bot, Loader2, CheckCircle2, Receipt, Copy, Pencil, Share2
+  Tag, Star, Megaphone, Bot, Loader2, CheckCircle2, Receipt, Copy, Pencil, Share2, Image as ImageIcon, Upload
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
@@ -320,6 +320,7 @@ export default function App() {
     { id: "clientes", label: "Clientes", icon: <Users size={18} /> },
     { id: "servicios", label: "Servicios y precios", icon: <Tag size={18} /> },
     { id: "cotizaciones", label: "Cotizaciones", icon: <Receipt size={18} /> },
+    { id: "fotosvideos", label: "Fotos y Videos", icon: <ImageIcon size={18} /> },
     { id: "catalogo", label: "Catálogo", icon: <Package size={18} /> },
     { id: "finanzas", label: "Finanzas", icon: <Wallet size={18} /> },
     { id: "resenas", label: "Reseñas", icon: <Star size={18} /> },
@@ -718,6 +719,7 @@ export default function App() {
         {activeTab === "cotizaciones" && (
           <Cotizaciones servicios={servicios} setServicios={setServicios} clientes={clientes} cotizaciones={cotizaciones} setCotizaciones={setCotizaciones} />
         )}
+        {activeTab === "fotosvideos" && <FotosVideos />}
         {activeTab === "catalogo" && (
           <Catalogo
             productos={productos}
@@ -1748,6 +1750,171 @@ function Cotizaciones({ servicios, setServicios, clientes, cotizaciones, setCoti
             <IconBtn danger onClick={() => setCotizaciones((cs) => cs.filter((x) => x.id !== c.id))}><Trash2 size={14} /></IconBtn>
           </div>
         ))}
+      </Card>
+    </div>
+  );
+}
+
+// ---------- Fotos y Videos (contenido llamativo para redes y para el portal de clientas) ----------
+function FotosVideos() {
+  const TAB_ID = "fotosvideos";
+  const TAB_LABEL = "Fotos y Videos";
+
+  const [items, setItems] = useState([]);
+  const [cargandoLista, setCargandoLista] = useState(true);
+  const [archivo, setArchivo] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState("");
+  const [tipoArchivo, setTipoArchivo] = useState("imagen");
+  const [caption, setCaption] = useState("");
+  const [subiendo, setSubiendo] = useState(false);
+  const [mensaje, setMensaje] = useState("");
+
+  const cargarItems = async () => {
+    setCargandoLista(true);
+    const { data: fila } = await supabase.from("app_data").select("data").eq("id", "main").maybeSingle();
+    const tabs = fila?.data?.contenido?.tabs || [];
+    const tab = tabs.find((t) => t.id === TAB_ID);
+    setItems(tab?.items || []);
+    setCargandoLista(false);
+  };
+
+  useEffect(() => { cargarItems(); }, []);
+
+  const elegirArchivo = (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    setArchivo(f);
+    setPreviewUrl(URL.createObjectURL(f));
+    setTipoArchivo(f.type.startsWith("video") ? "video" : "imagen");
+    setMensaje("");
+  };
+
+  const publicar = async () => {
+    if (!archivo || !caption.trim()) {
+      setMensaje("Elige un archivo y escribe un texto antes de publicar.");
+      return;
+    }
+    setSubiendo(true);
+    setMensaje("");
+    try {
+      const nombreArchivo = `${Date.now()}_${archivo.name}`;
+      const { error: errSubida } = await supabase.storage.from("kajalu-fotos").upload(nombreArchivo, archivo);
+      if (errSubida) throw errSubida;
+      const { data: urlData } = supabase.storage.from("kajalu-fotos").getPublicUrl(nombreArchivo);
+      const url = urlData.publicUrl;
+
+      // Guardar en app_data.contenido para que aparezca en el portal de clientas
+      const { data: fila } = await supabase.from("app_data").select("data").eq("id", "main").maybeSingle();
+      const actual = fila?.data || {};
+      const contenidoActual = actual.contenido || { tabs: [] };
+      let tabs = contenidoActual.tabs || [];
+      const nuevoItem = { titulo: caption.trim(), imagenUrl: url, tipoMedia: tipoArchivo };
+
+      const yaExiste = tabs.some((t) => t.id === TAB_ID);
+      if (yaExiste) {
+        tabs = tabs.map((t) => (t.id === TAB_ID ? { ...t, items: [...t.items, nuevoItem] } : t));
+      } else {
+        tabs = [...tabs, { id: TAB_ID, label: TAB_LABEL, tipo: "info", items: [nuevoItem] }];
+      }
+
+      await supabase.from("app_data").upsert({
+        id: "main",
+        data: { ...actual, contenido: { ...contenidoActual, tabs } },
+        updated_at: new Date().toISOString(),
+      });
+
+      // Compartir a redes sociales (selector nativo en celular, WhatsApp Web en computador)
+      compartir(`${caption.trim()}\n\n${url}`);
+
+      setItems((prev) => [...prev, nuevoItem]);
+      setArchivo(null);
+      setPreviewUrl("");
+      setCaption("");
+      setMensaje("¡Publicado! Ya está visible en el portal de clientas.");
+    } catch (e) {
+      setMensaje("No se pudo publicar: " + e.message);
+    } finally {
+      setSubiendo(false);
+    }
+  };
+
+  const eliminarItem = async (index) => {
+    const { data: fila } = await supabase.from("app_data").select("data").eq("id", "main").maybeSingle();
+    const actual = fila?.data || {};
+    const contenidoActual = actual.contenido || { tabs: [] };
+    const tabs = (contenidoActual.tabs || []).map((t) =>
+      t.id === TAB_ID ? { ...t, items: t.items.filter((_, i) => i !== index) } : t
+    );
+    await supabase.from("app_data").upsert({
+      id: "main",
+      data: { ...actual, contenido: { ...contenidoActual, tabs } },
+      updated_at: new Date().toISOString(),
+    });
+    setItems((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  return (
+    <div>
+      <SectionHeader
+        icon={<ImageIcon size={18} />}
+        title="Fotos y videos"
+        subtitle="Sube contenido llamativo, publícalo en el portal de clientas y compártelo en redes sociales al mismo tiempo."
+      />
+
+      <Card>
+        <h3>Nueva publicación</h3>
+        <div className="k-form" style={{ marginBottom: 10 }}>
+          <input type="file" accept="image/*,video/*" onChange={elegirArchivo} disabled={subiendo} />
+        </div>
+
+        {previewUrl && (
+          <div style={{ marginBottom: 10 }}>
+            {tipoArchivo === "video" ? (
+              <video src={previewUrl} controls style={{ width: "100%", maxWidth: 320, borderRadius: 10 }} />
+            ) : (
+              <img src={previewUrl} alt="vista previa" style={{ width: "100%", maxWidth: 320, borderRadius: 10 }} />
+            )}
+          </div>
+        )}
+
+        <div className="k-form">
+          <input
+            placeholder="Texto llamativo (ej: ¡Nueva promo de manicure! 💅)"
+            value={caption}
+            onChange={(e) => setCaption(e.target.value)}
+            style={{ flex: 2 }}
+          />
+          <button className="k-btn" onClick={publicar} disabled={subiendo}>
+            {subiendo ? <Loader2 size={14} className="k-spin" /> : <Upload size={14} />}
+            {subiendo ? "Publicando…" : "Publicar"}
+          </button>
+        </div>
+        {mensaje && <p style={{ fontSize: 13, color: mensaje.startsWith("No se pudo") ? "var(--danger)" : "var(--success)", marginTop: 8 }}>{mensaje}</p>}
+        <p style={{ fontSize: 12, color: "var(--ink-soft)", marginTop: 6 }}>
+          "Publicar" hace dos cosas a la vez: lo agrega al portal de clientas y abre el selector para compartirlo en tus redes.
+        </p>
+      </Card>
+
+      <Card>
+        <h3>Ya publicado</h3>
+        {cargandoLista && <EmptyState text="Cargando…" />}
+        {!cargandoLista && items.length === 0 && <EmptyState text="Aún no has publicado fotos ni videos." />}
+        <div className="k-grid cols-2">
+          {items.map((item, i) => (
+            <div className="k-tipcard" key={i} style={{ position: "relative" }}>
+              {item.tipoMedia === "video" ? (
+                <video src={item.imagenUrl} controls style={{ width: "100%", borderRadius: 8, marginBottom: 8 }} />
+              ) : (
+                <img src={item.imagenUrl} alt={item.titulo} style={{ width: "100%", borderRadius: 8, marginBottom: 8 }} />
+              )}
+              <p style={{ margin: 0 }}>{item.titulo}</p>
+              <div style={{ position: "absolute", top: 10, right: 10, display: "flex", gap: 2 }}>
+                <IconBtn onClick={() => compartir(`${item.titulo}\n\n${item.imagenUrl}`)} title="Compartir"><Share2 size={14} /></IconBtn>
+                <IconBtn danger onClick={() => eliminarItem(i)} title="Eliminar"><Trash2 size={14} /></IconBtn>
+              </div>
+            </div>
+          ))}
+        </div>
       </Card>
     </div>
   );

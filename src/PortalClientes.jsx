@@ -648,7 +648,11 @@ Si falta la hora, usa "10:00". Si falta la fecha, usa el próximo día hábil.`;
                       const waLink = `https://wa.me/573145390510?text=${encodeURIComponent("Hola, quiero comprar: " + item.titulo)}`;
                       return (
                         <div className="p-item" key={i}>
-                          {item.imagenUrl && <img src={item.imagenUrl} alt={item.titulo} className="p-item-img" />}
+                          {item.imagenUrl && item.tipoMedia === "video" ? (
+                            <video src={item.imagenUrl} controls className="p-item-img" />
+                          ) : (
+                            item.imagenUrl && <img src={item.imagenUrl} alt={item.titulo} className="p-item-img" />
+                          )}
                           <div className="p-item-titulo">{item.titulo}</div>
                           {item.detalle && <div className="p-item-detalle">{item.detalle}</div>}
                           {tabActual?.tipo === "catalogo" && (
