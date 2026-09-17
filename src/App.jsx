@@ -4,7 +4,7 @@ import {
   Home, CalendarCheck, Users, Package, Wallet, CheckSquare, BellRing,
   MessageCircle, Sparkles, Plus, Trash2, Phone, AlertTriangle,
   TrendingUp, TrendingDown, ShoppingCart, ChevronRight, Sun,
-  Tag, Star, Megaphone, Bot, Loader2, CheckCircle2, Receipt, Copy, Pencil, Share2, Image as ImageIcon, Upload, Layers
+  Tag, Star, Megaphone, Bot, Loader2, CheckCircle2, Receipt, Copy, Pencil, Share2, Image as ImageIcon, Upload, Layers, PanelTop, ExternalLink
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
@@ -321,6 +321,7 @@ export default function App() {
     { id: "servicios", label: "Servicios y precios", icon: <Tag size={18} /> },
     { id: "cotizaciones", label: "Cotizaciones", icon: <Receipt size={18} /> },
     { id: "fotosvideos", label: "Fotos y Videos", icon: <ImageIcon size={18} /> },
+    { id: "portada", label: "Portada del portal", icon: <PanelTop size={18} /> },
     { id: "contenido", label: "Contenido del portal", icon: <Layers size={18} /> },
     { id: "catalogo", label: "Catálogo", icon: <Package size={18} /> },
     { id: "finanzas", label: "Finanzas", icon: <Wallet size={18} /> },
@@ -721,6 +722,7 @@ export default function App() {
           <Cotizaciones servicios={servicios} setServicios={setServicios} clientes={clientes} cotizaciones={cotizaciones} setCotizaciones={setCotizaciones} />
         )}
         {activeTab === "fotosvideos" && <FotosVideos />}
+        {activeTab === "portada" && <PortadaPortal />}
         {activeTab === "contenido" && <ContenidoPortal />}
         {activeTab === "catalogo" && (
           <Catalogo
@@ -1922,36 +1924,25 @@ function FotosVideos() {
   );
 }
 
-// ---------- Contenido del portal (Catálogo, Promociones, Tips, Reseñas, y pestañas nuevas) ----------
-function ContenidoPortal() {
-  const [contenido, setContenido] = useState({ tabs: [] });
-  const [cargando, setCargando] = useState(true);
-  const [tabActiva, setTabActiva] = useState("");
+// ---------- Portada del portal de clientas ----------
+function PortadaPortal() {
   const [portada, setPortada] = useState("");
-  const [subiendoPortada, setSubiendoPortada] = useState(false);
-
-  const [nuevoItem, setNuevoItem] = useState({ titulo: "", detalle: "", imagenUrl: "" });
-  const [subiendoImagen, setSubiendoImagen] = useState(false);
-
-  const [nuevaPestañaNombre, setNuevaPestañaNombre] = useState("");
-  const [nuevaPestañaTipo, setNuevaPestañaTipo] = useState("info");
-  const [mostrandoFormPestaña, setMostrandoFormPestaña] = useState(false);
+  const [subiendo, setSubiendo] = useState(false);
+  const [cargando, setCargando] = useState(true);
 
   const cargar = async () => {
     setCargando(true);
     const { data: fila } = await supabase.from("app_data").select("data").eq("id", "main").maybeSingle();
-    const c = fila?.data?.contenido || { tabs: [] };
-    setContenido(c);
     if (fila?.data?.portada) setPortada(fila.data.portada);
-    const gestionables = c.tabs.filter((t) => t.id !== "fotosvideos");
-    if (gestionables.length > 0) setTabActiva(gestionables[0].id);
     setCargando(false);
   };
+
+  useEffect(() => { cargar(); }, []);
 
   const subirPortada = async (e) => {
     const archivo = e.target.files[0];
     if (!archivo) return;
-    setSubiendoPortada(true);
+    setSubiendo(true);
     try {
       const nombreArchivo = `portada_${Date.now()}_${archivo.name}`;
       const { error } = await supabase.storage.from("kajalu-fotos").upload(nombreArchivo, archivo);
@@ -1968,8 +1959,86 @@ function ContenidoPortal() {
     } catch (err) {
       alert("No se pudo subir la portada: " + err.message);
     } finally {
-      setSubiendoPortada(false);
+      setSubiendo(false);
     }
+  };
+
+  const bancosDeImagenes = [
+    { nombre: "Unsplash", url: "https://unsplash.com/s/photos/beauty-salon" },
+    { nombre: "Pexels", url: "https://www.pexels.com/search/beauty%20salon/" },
+    { nombre: "Freepik", url: "https://www.freepik.com/search?query=beauty%20salon" },
+    { nombre: "Canva (crear tu propia portada)", url: "https://www.canva.com/facebook-covers/templates/beauty/" },
+  ];
+
+  if (cargando) return <EmptyState text="Cargando…" />;
+
+  return (
+    <div>
+      <SectionHeader
+        icon={<PanelTop size={18} />}
+        title="Portada del portal de clientas"
+        subtitle="Es la imagen ancha que ven las clientas arriba de todo, como la portada de una página de Facebook."
+      />
+
+      <Card>
+        <h3>Portada actual</h3>
+        {portada ? (
+          <img src={portada} alt="Portada actual" style={{ width: "100%", maxWidth: 500, borderRadius: 10, marginBottom: 12 }} />
+        ) : (
+          <EmptyState text="Todavía no has subido una portada — se muestra un degradado de ejemplo mientras tanto." />
+        )}
+        <input type="file" accept="image/*" onChange={subirPortada} disabled={subiendo} />
+        {subiendo && <span style={{ fontSize: 12.5, color: "var(--ink-soft)", marginLeft: 8 }}>Subiendo…</span>}
+        <p style={{ fontSize: 12, color: "var(--ink-soft)", marginTop: 8 }}>
+          Puedes elegir una foto de tu teléfono o de tu computador — el botón de arriba abre el explorador de archivos de tu dispositivo.
+        </p>
+      </Card>
+
+      <Card>
+        <h3>¿No tienes una foto lista? Busca un fondo gratis aquí</h3>
+        <p style={{ fontSize: 13, color: "var(--ink-soft)", marginTop: 0 }}>
+          Busca algo relacionado a belleza o spa, descárgalo a tu dispositivo, y luego súbelo arriba.
+        </p>
+        <div className="k-form" style={{ flexDirection: "column", alignItems: "flex-start" }}>
+          {bancosDeImagenes.map((b) => (
+            <a
+              key={b.nombre}
+              href={b.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="k-btn ghost"
+              style={{ textDecoration: "none", marginBottom: 6 }}
+            >
+              <ExternalLink size={14} />{b.nombre}
+            </a>
+          ))}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+// ---------- Contenido del portal (Catálogo, Promociones, Tips, Reseñas, y pestañas nuevas) ----------
+function ContenidoPortal() {
+  const [contenido, setContenido] = useState({ tabs: [] });
+  const [cargando, setCargando] = useState(true);
+  const [tabActiva, setTabActiva] = useState("");
+
+  const [nuevoItem, setNuevoItem] = useState({ titulo: "", detalle: "", imagenUrl: "" });
+  const [subiendoImagen, setSubiendoImagen] = useState(false);
+
+  const [nuevaPestañaNombre, setNuevaPestañaNombre] = useState("");
+  const [nuevaPestañaTipo, setNuevaPestañaTipo] = useState("info");
+  const [mostrandoFormPestaña, setMostrandoFormPestaña] = useState(false);
+
+  const cargar = async () => {
+    setCargando(true);
+    const { data: fila } = await supabase.from("app_data").select("data").eq("id", "main").maybeSingle();
+    const c = fila?.data?.contenido || { tabs: [] };
+    setContenido(c);
+    const gestionables = c.tabs.filter((t) => t.id !== "fotosvideos");
+    if (gestionables.length > 0) setTabActiva(gestionables[0].id);
+    setCargando(false);
   };
 
   useEffect(() => { cargar(); }, []);
@@ -2050,16 +2119,6 @@ function ContenidoPortal() {
         title="Contenido del portal de clientas"
         subtitle="Administra Catálogo, Promociones, Tips, Reseñas y cualquier pestaña nueva — se refleja directo en el portal."
       />
-
-      <Card>
-        <h3>Portada del portal</h3>
-        <p style={{ fontSize: 13, color: "var(--ink-soft)", marginTop: 0 }}>
-          Es la imagen ancha que ven las clientas arriba de todo, como la portada de una página de Facebook.
-        </p>
-        {portada && <img src={portada} alt="Portada actual" style={{ width: "100%", maxWidth: 400, borderRadius: 10, marginBottom: 10 }} />}
-        <input type="file" accept="image/*" onChange={subirPortada} disabled={subiendoPortada} />
-        {subiendoPortada && <span style={{ fontSize: 12.5, color: "var(--ink-soft)", marginLeft: 8 }}>Subiendo…</span>}
-      </Card>
 
       <Card>
         <h3>Pestañas</h3>
