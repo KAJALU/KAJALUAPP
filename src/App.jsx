@@ -4,7 +4,8 @@ import {
   Home, CalendarCheck, Users, Package, Wallet, CheckSquare, BellRing,
   MessageCircle, Sparkles, Plus, Trash2, Phone, AlertTriangle,
   TrendingUp, TrendingDown, ShoppingCart, ChevronRight, Sun,
-  Tag, Star, Megaphone, Bot, Loader2, CheckCircle2, Receipt, Copy, Pencil, Share2, Image as ImageIcon, Upload, Layers, PanelTop, ExternalLink
+  Tag, Star, Megaphone, Bot, Loader2, CheckCircle2, Receipt, Copy, Pencil, Share2, Image as ImageIcon, Upload, Layers, PanelTop, ExternalLink,
+  Crop, RotateCw, FlipHorizontal, Grid2x2, Undo2, Link as LinkIcon
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
@@ -140,13 +141,22 @@ const CATALOGO_REFERENCIA = [
   { nombre: "Aminoácidos", categoria: "Cabello" },
   { nombre: "Hidratación capilar", categoria: "Cabello" },
   { nombre: "Cubrimiento de canas", categoria: "Cabello" },
-  { nombre: "Pedicure y manicure tradicional", categoria: "Uñas" },
+  { nombre: "Uñas tradicionales - pies", categoria: "Uñas" },
+  { nombre: "Uñas tradicionales - manos", categoria: "Uñas" },
   { nombre: "Semipermanente en uña natural", categoria: "Uñas" },
   { nombre: "Press on", categoria: "Uñas" },
   { nombre: "Despigmentación de zonas oscuras", categoria: "Rostro" },
   { nombre: "Limpieza facial total", categoria: "Rostro" },
   { nombre: "Alta frecuencia facial y capilar", categoria: "Rostro" },
-  { nombre: "Depilación con cera", categoria: "Cuerpo" },
+  { nombre: "Bozo", categoria: "Depilaciones" },
+  { nombre: "Axilas", categoria: "Depilaciones" },
+  { nombre: "Media pierna", categoria: "Depilaciones" },
+  { nombre: "Piernas completa", categoria: "Depilaciones" },
+  { nombre: "Cejas cuchilla", categoria: "Depilaciones" },
+  { nombre: "Cejas cera", categoria: "Depilaciones" },
+  { nombre: "Bikini completo", categoria: "Depilaciones" },
+  { nombre: "Bikini completo + cola", categoria: "Depilaciones" },
+  { nombre: "Bikini parcial", categoria: "Depilaciones" },
   { nombre: "Masaje relajante completo", categoria: "Masajes" },
   { nombre: "Masaje descontracturante", categoria: "Masajes" },
   { nombre: "Drenajes linfáticos", categoria: "Masajes" },
@@ -321,6 +331,7 @@ export default function App() {
     { id: "servicios", label: "Servicios y precios", icon: <Tag size={18} /> },
     { id: "cotizaciones", label: "Cotizaciones", icon: <Receipt size={18} /> },
     { id: "fotosvideos", label: "Fotos y Videos", icon: <ImageIcon size={18} /> },
+    { id: "catalogopublicitario", label: "Catálogo publicitario", icon: <Grid2x2 size={18} /> },
     { id: "portada", label: "Portada del portal", icon: <PanelTop size={18} /> },
     { id: "contenido", label: "Contenido del portal", icon: <Layers size={18} /> },
     { id: "catalogo", label: "Catálogo", icon: <Package size={18} /> },
@@ -722,6 +733,7 @@ export default function App() {
           <Cotizaciones servicios={servicios} setServicios={setServicios} clientes={clientes} cotizaciones={cotizaciones} setCotizaciones={setCotizaciones} />
         )}
         {activeTab === "fotosvideos" && <FotosVideos />}
+        {activeTab === "catalogopublicitario" && <CatalogoPublicitario />}
         {activeTab === "portada" && <PortadaPortal />}
         {activeTab === "contenido" && <ContenidoPortal />}
         {activeTab === "catalogo" && (
@@ -2011,6 +2023,402 @@ function PortadaPortal() {
             >
               <ExternalLink size={14} />{b.nombre}
             </a>
+          ))}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+// ---------- Catálogo publicitario (editor de fotos: recorte, ajustes y collage) ----------
+function CatalogoPublicitario() {
+  const TAB_ID = "catalogopublicitario";
+  const TAB_LABEL = "Catálogo publicitario";
+
+  const canvasRef = React.useRef(null);
+  const [imagenOriginal, setImagenOriginal] = useState(null); // dataURL original, para "Deshacer"
+  const [imagenActual, setImagenActual] = useState(null); // dataURL con los cambios aplicados
+  const [ajustes, setAjustes] = useState({ brillo: 100, contraste: 100, saturacion: 100 });
+  const [rotacion, setRotacion] = useState(0);
+  const [volteado, setVolteado] = useState(false);
+
+  const [urlWeb, setUrlWeb] = useState("");
+  const [galeriaCollage, setGaleriaCollage] = useState([]); // imágenes candidatas para collage
+  const [seleccionCollage, setSeleccionCollage] = useState([]);
+
+  const [descripcion, setDescripcion] = useState("");
+  const [publicando, setPublicando] = useState(false);
+  const [mensaje, setMensaje] = useState("");
+
+  const [items, setItems] = useState([]);
+  const [cargandoLista, setCargandoLista] = useState(true);
+
+  const cargarItems = async () => {
+    setCargandoLista(true);
+    const { data: fila } = await supabase.from("app_data").select("data").eq("id", "main").maybeSingle();
+    const tabs = fila?.data?.contenido?.tabs || [];
+    const tab = tabs.find((t) => t.id === TAB_ID);
+    setItems(tab?.items || []);
+    setCargandoLista(false);
+  };
+
+  useEffect(() => { cargarItems(); }, []);
+
+  const cargarDesdeArchivo = (e) => {
+    const archivos = Array.from(e.target.files || []);
+    archivos.forEach((archivo) => {
+      const lector = new FileReader();
+      lector.onload = (ev) => {
+        const dataUrl = ev.target.result;
+        if (!imagenActual) {
+          setImagenOriginal(dataUrl);
+          setImagenActual(dataUrl);
+          setAjustes({ brillo: 100, contraste: 100, saturacion: 100 });
+          setRotacion(0);
+          setVolteado(false);
+        }
+        setGaleriaCollage((prev) => [...prev, dataUrl]);
+      };
+      lector.readAsDataURL(archivo);
+    });
+    setMensaje("");
+  };
+
+  const cargarDesdeUrl = () => {
+    if (!urlWeb.trim()) return;
+    const url = urlWeb.trim();
+    if (!imagenActual) {
+      setImagenOriginal(url);
+      setImagenActual(url);
+      setAjustes({ brillo: 100, contraste: 100, saturacion: 100 });
+      setRotacion(0);
+      setVolteado(false);
+    }
+    setGaleriaCollage((prev) => [...prev, url]);
+    setUrlWeb("");
+  };
+
+  const dibujarEnCanvas = (fuenteUrl, { rot = 0, flip = false, filtro = "" } = {}) =>
+    new Promise((resolve, reject) => {
+      const img = new window.Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        const giro90 = rot % 180 !== 0;
+        canvas.width = giro90 ? img.height : img.width;
+        canvas.height = giro90 ? img.width : img.height;
+        ctx.filter = filtro;
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.rotate((rot * Math.PI) / 180);
+        if (flip) ctx.scale(-1, 1);
+        ctx.drawImage(img, -img.width / 2, -img.height / 2);
+        resolve(canvas.toDataURL("image/jpeg", 0.92));
+      };
+      img.onerror = () => reject(new Error("No se pudo cargar la imagen (revisa la URL o intenta con otro archivo)."));
+      img.src = fuenteUrl;
+    });
+
+  const aplicarAjustes = async () => {
+    try {
+      const filtro = `brightness(${ajustes.brillo}%) contrast(${ajustes.contraste}%) saturate(${ajustes.saturacion}%)`;
+      const resultado = await dibujarEnCanvas(imagenOriginal, { rot: rotacion, flip: volteado, filtro });
+      setImagenActual(resultado);
+      setMensaje("");
+    } catch (e) {
+      setMensaje(e.message);
+    }
+  };
+
+  const recortarCuadrado = async () => {
+    try {
+      const img = await new Promise((resolve, reject) => {
+        const i = new window.Image();
+        i.crossOrigin = "anonymous";
+        i.onload = () => resolve(i);
+        i.onerror = () => reject(new Error("No se pudo recortar la imagen."));
+        i.src = imagenActual;
+      });
+      const lado = Math.min(img.width, img.height);
+      const canvas = document.createElement("canvas");
+      canvas.width = lado;
+      canvas.height = lado;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, (img.width - lado) / 2, (img.height - lado) / 2, lado, lado, 0, 0, lado, lado);
+      const resultado = canvas.toDataURL("image/jpeg", 0.92);
+      setImagenActual(resultado);
+      setImagenOriginal(resultado);
+      setRotacion(0);
+      setVolteado(false);
+      setAjustes({ brillo: 100, contraste: 100, saturacion: 100 });
+    } catch (e) {
+      setMensaje(e.message);
+    }
+  };
+
+  const rotar = () => setRotacion((r) => (r + 90) % 360);
+  const voltear = () => setVolteado((v) => !v);
+  const deshacer = () => {
+    setImagenActual(imagenOriginal);
+    setRotacion(0);
+    setVolteado(false);
+    setAjustes({ brillo: 100, contraste: 100, saturacion: 100 });
+  };
+
+  React.useEffect(() => {
+    if (imagenOriginal) aplicarAjustes();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rotacion, volteado]);
+
+  const toggleSeleccionCollage = (url) => {
+    setSeleccionCollage((prev) => (prev.includes(url) ? prev.filter((u) => u !== url) : [...prev, url]));
+  };
+
+  const crearCollage = async () => {
+    if (seleccionCollage.length < 2) {
+      setMensaje("Elige al menos 2 fotos para armar el collage.");
+      return;
+    }
+    try {
+      const imgs = await Promise.all(
+        seleccionCollage.slice(0, 4).map(
+          (url) =>
+            new Promise((resolve, reject) => {
+              const i = new window.Image();
+              i.crossOrigin = "anonymous";
+              i.onload = () => resolve(i);
+              i.onerror = () => reject(new Error("No se pudo cargar una de las fotos del collage."));
+              i.src = url;
+            })
+        )
+      );
+      const tam = 600;
+      const canvas = document.createElement("canvas");
+      canvas.width = tam;
+      canvas.height = tam;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "white";
+      ctx.fillRect(0, 0, tam, tam);
+
+      const dibujarCubriendo = (img, x, y, w, h) => {
+        const escala = Math.max(w / img.width, h / img.height);
+        const nw = img.width * escala;
+        const nh = img.height * escala;
+        ctx.drawImage(img, x + (w - nw) / 2, y + (h - nh) / 2, nw, nh);
+      };
+
+      if (imgs.length === 2) {
+        dibujarCubriendo(imgs[0], 0, 0, tam / 2 - 2, tam);
+        dibujarCubriendo(imgs[1], tam / 2 + 2, 0, tam / 2 - 2, tam);
+      } else if (imgs.length === 3) {
+        dibujarCubriendo(imgs[0], 0, 0, tam, tam / 2 - 2);
+        dibujarCubriendo(imgs[1], 0, tam / 2 + 2, tam / 2 - 2, tam / 2 - 2);
+        dibujarCubriendo(imgs[2], tam / 2 + 2, tam / 2 + 2, tam / 2 - 2, tam / 2 - 2);
+      } else {
+        dibujarCubriendo(imgs[0], 0, 0, tam / 2 - 2, tam / 2 - 2);
+        dibujarCubriendo(imgs[1], tam / 2 + 2, 0, tam / 2 - 2, tam / 2 - 2);
+        dibujarCubriendo(imgs[2], 0, tam / 2 + 2, tam / 2 - 2, tam / 2 - 2);
+        dibujarCubriendo(imgs[3], tam / 2 + 2, tam / 2 + 2, tam / 2 - 2, tam / 2 - 2);
+      }
+
+      const resultado = canvas.toDataURL("image/jpeg", 0.92);
+      setImagenOriginal(resultado);
+      setImagenActual(resultado);
+      setRotacion(0);
+      setVolteado(false);
+      setAjustes({ brillo: 100, contraste: 100, saturacion: 100 });
+      setMensaje("¡Collage creado! Ahora puedes ajustarlo o publicarlo.");
+    } catch (e) {
+      setMensaje(e.message);
+    }
+  };
+
+  const publicar = async () => {
+    if (!imagenActual || !descripcion.trim()) {
+      setMensaje("Elige/edita una foto y escribe una descripción antes de publicar.");
+      return;
+    }
+    setPublicando(true);
+    setMensaje("");
+    try {
+      const respuesta = await fetch(imagenActual);
+      const blob = await respuesta.blob();
+      const nombreArchivo = `${Date.now()}_catalogo.jpg`;
+      const { error: errSubida } = await supabase.storage.from("kajalu-fotos").upload(nombreArchivo, blob, { contentType: "image/jpeg" });
+      if (errSubida) throw errSubida;
+      const { data: urlData } = supabase.storage.from("kajalu-fotos").getPublicUrl(nombreArchivo);
+      const url = urlData.publicUrl;
+
+      const { data: fila } = await supabase.from("app_data").select("data").eq("id", "main").maybeSingle();
+      const actual = fila?.data || {};
+      const contenidoActual = actual.contenido || { tabs: [] };
+      let tabs = contenidoActual.tabs || [];
+      const nuevoItem = { titulo: descripcion.trim(), imagenUrl: url, tipoMedia: "imagen" };
+
+      const yaExiste = tabs.some((t) => t.id === TAB_ID);
+      if (yaExiste) {
+        tabs = tabs.map((t) => (t.id === TAB_ID ? { ...t, items: [...t.items, nuevoItem] } : t));
+      } else {
+        tabs = [...tabs, { id: TAB_ID, label: TAB_LABEL, tipo: "catalogo", items: [nuevoItem] }];
+      }
+
+      await supabase.from("app_data").upsert({
+        id: "main",
+        data: { ...actual, contenido: { ...contenidoActual, tabs } },
+        updated_at: new Date().toISOString(),
+      });
+
+      compartir(`${descripcion.trim()}\n\n${url}`);
+
+      setItems((prev) => [...prev, nuevoItem]);
+      setImagenOriginal(null);
+      setImagenActual(null);
+      setGaleriaCollage([]);
+      setSeleccionCollage([]);
+      setDescripcion("");
+      setMensaje("¡Publicado! Ya está visible en el portal de clientas.");
+    } catch (e) {
+      setMensaje("No se pudo publicar: " + e.message);
+    } finally {
+      setPublicando(false);
+    }
+  };
+
+  const eliminarItem = async (index) => {
+    const { data: fila } = await supabase.from("app_data").select("data").eq("id", "main").maybeSingle();
+    const actual = fila?.data || {};
+    const contenidoActual = actual.contenido || { tabs: [] };
+    const tabs = (contenidoActual.tabs || []).map((t) =>
+      t.id === TAB_ID ? { ...t, items: t.items.filter((_, i) => i !== index) } : t
+    );
+    await supabase.from("app_data").upsert({
+      id: "main",
+      data: { ...actual, contenido: { ...contenidoActual, tabs } },
+      updated_at: new Date().toISOString(),
+    });
+    setItems((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  return (
+    <div>
+      <SectionHeader
+        icon={<Grid2x2 size={18} />}
+        title="Catálogo publicitario"
+        subtitle="Sube o pega fotos, edítalas, arma collages, ponles descripción y publícalas en el portal de clientas y tus redes."
+      />
+
+      <Card>
+        <h3>1. Elige tus fotos</h3>
+        <div className="k-form">
+          <input type="file" accept="image/*" multiple onChange={cargarDesdeArchivo} />
+        </div>
+        <div className="k-form" style={{ marginTop: 8 }}>
+          <input placeholder="O pega una URL de imagen de internet" value={urlWeb} onChange={(e) => setUrlWeb(e.target.value)} style={{ flex: 1 }} />
+          <button className="k-btn ghost" onClick={cargarDesdeUrl}><LinkIcon size={14} />Agregar URL</button>
+        </div>
+        <p style={{ fontSize: 12, color: "var(--ink-soft)", marginTop: 6 }}>
+          Puedes subir varias fotos a la vez desde tu celular o computador; la primera se abre en el editor y todas quedan disponibles abajo para el collage.
+        </p>
+      </Card>
+
+      {imagenActual && (
+        <Card>
+          <h3>2. Editor</h3>
+          <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+            <img
+              src={imagenActual}
+              alt="Editando"
+              style={{ maxWidth: 260, maxHeight: 260, borderRadius: 10, border: "1px solid var(--line)", objectFit: "contain" }}
+            />
+            <div style={{ flex: 1, minWidth: 220 }}>
+              <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+                <button className="k-btn ghost" onClick={rotar}><RotateCw size={14} />Rotar</button>
+                <button className="k-btn ghost" onClick={voltear}><FlipHorizontal size={14} />Voltear</button>
+                <button className="k-btn ghost" onClick={recortarCuadrado}><Crop size={14} />Recorte cuadrado</button>
+                <button className="k-btn ghost" onClick={deshacer}><Undo2 size={14} />Deshacer todo</button>
+              </div>
+
+              <label style={{ fontSize: 12.5, color: "var(--ink-soft)" }}>Brillo: {ajustes.brillo}%</label>
+              <input
+                type="range" min="50" max="150" value={ajustes.brillo}
+                onChange={(e) => setAjustes({ ...ajustes, brillo: Number(e.target.value) })}
+                onMouseUp={aplicarAjustes} onTouchEnd={aplicarAjustes}
+                style={{ width: "100%" }}
+              />
+              <label style={{ fontSize: 12.5, color: "var(--ink-soft)" }}>Contraste: {ajustes.contraste}%</label>
+              <input
+                type="range" min="50" max="150" value={ajustes.contraste}
+                onChange={(e) => setAjustes({ ...ajustes, contraste: Number(e.target.value) })}
+                onMouseUp={aplicarAjustes} onTouchEnd={aplicarAjustes}
+                style={{ width: "100%" }}
+              />
+              <label style={{ fontSize: 12.5, color: "var(--ink-soft)" }}>Saturación: {ajustes.saturacion}%</label>
+              <input
+                type="range" min="0" max="200" value={ajustes.saturacion}
+                onChange={(e) => setAjustes({ ...ajustes, saturacion: Number(e.target.value) })}
+                onMouseUp={aplicarAjustes} onTouchEnd={aplicarAjustes}
+                style={{ width: "100%" }}
+              />
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {galeriaCollage.length > 1 && (
+        <Card>
+          <h3>3. Armar collage (opcional)</h3>
+          <p style={{ fontSize: 12.5, color: "var(--ink-soft)", marginTop: 0 }}>Elige 2 a 4 fotos de las que subiste arriba.</p>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+            {galeriaCollage.map((url, i) => (
+              <img
+                key={i}
+                src={url}
+                alt=""
+                onClick={() => toggleSeleccionCollage(url)}
+                style={{
+                  width: 70, height: 70, objectFit: "cover", borderRadius: 8, cursor: "pointer",
+                  border: seleccionCollage.includes(url) ? "3px solid var(--accent)" : "1px solid var(--line)",
+                }}
+              />
+            ))}
+          </div>
+          <button className="k-btn ghost" onClick={crearCollage}><Grid2x2 size={14} />Crear collage con las seleccionadas</button>
+        </Card>
+      )}
+
+      <Card>
+        <h3>4. Descripción</h3>
+        <textarea
+          className="k-form"
+          style={{ width: "100%", minHeight: 70, fontFamily: "'Inter', sans-serif", fontSize: 13.5, padding: 10, border: "1px solid var(--line)", borderRadius: 8, background: "var(--bg)", color: "var(--ink)" }}
+          placeholder="Describe el producto o promoción (ej: Kit de pinceles profesional — $65.000, ideal para maquillaje social)"
+          value={descripcion}
+          onChange={(e) => setDescripcion(e.target.value)}
+        />
+      </Card>
+
+      <Card>
+        <button className="k-btn" onClick={publicar} disabled={publicando}>
+          {publicando ? <Loader2 size={14} className="k-spin" /> : <Upload size={14} />}
+          {publicando ? "Publicando…" : "Publicar en el portal y compartir"}
+        </button>
+        {mensaje && <p style={{ fontSize: 13, color: mensaje.startsWith("No se pudo") ? "var(--danger)" : "var(--success)", marginTop: 10 }}>{mensaje}</p>}
+      </Card>
+
+      <Card>
+        <h3>Ya publicado</h3>
+        {cargandoLista && <EmptyState text="Cargando…" />}
+        {!cargandoLista && items.length === 0 && <EmptyState text="Aún no has publicado nada en el catálogo publicitario." />}
+        <div className="k-grid cols-2">
+          {items.map((item, i) => (
+            <div className="k-tipcard" key={i} style={{ position: "relative" }}>
+              <img src={item.imagenUrl} alt={item.titulo} style={{ width: "100%", borderRadius: 8, marginBottom: 8 }} />
+              <p style={{ margin: 0 }}>{item.titulo}</p>
+              <div style={{ position: "absolute", top: 10, right: 10, display: "flex", gap: 2 }}>
+                <IconBtn onClick={() => compartir(`${item.titulo}\n\n${item.imagenUrl}`)} title="Compartir"><Share2 size={14} /></IconBtn>
+                <IconBtn danger onClick={() => eliminarItem(i)} title="Eliminar"><Trash2 size={14} /></IconBtn>
+              </div>
+            </div>
           ))}
         </div>
       </Card>
