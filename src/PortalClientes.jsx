@@ -115,12 +115,7 @@ export default function PortalClientes() {
         const texto = (data.text || "").trim().replace(/^"|"$/g, "") || "Hoy es un buen día para consentirte un poco.";
         setMensajeDelDia(texto);
 
-        const actual = fila?.data || {};
-        await supabase.from("app_data").upsert({
-          id: "main",
-          data: { ...actual, mensajeDia: { fecha: hoy, texto } },
-          updated_at: new Date().toISOString(),
-        });
+        await supabase.rpc("actualizar_mensaje_dia", { p_fecha: hoy, p_texto: texto });
       } catch (e) {
         setMensajeDelDia("Hoy es un buen día para consentirte un poco.");
       }
@@ -149,11 +144,25 @@ export default function PortalClientes() {
 
   const publicarResena = async () => {
     if (!textoResena.trim()) return;
-    const item = { titulo: perfilForm.nombre || session.user.email, detalle: textoResena.trim() };
-    const nuevasTabs = contenido.tabs.map((t) =>
-      t.id === tabActiva ? { ...t, items: [...t.items, item] } : t
-    );
-    await guardarContenido({ ...contenido, tabs: nuevasTabs });
+    const titulo = perfilForm.nombre || session.user.email;
+    const detalle = textoResena.trim();
+
+    const { error } = await supabase.rpc("publicar_resena_cliente", {
+      p_tab_id: tabActiva,
+      p_titulo: titulo,
+      p_detalle: detalle,
+    });
+    if (error) {
+      console.error("No se pudo publicar la reseña:", error);
+      return;
+    }
+
+    setContenido((prev) => ({
+      ...prev,
+      tabs: prev.tabs.map((t) =>
+        t.id === tabActiva ? { ...t, items: [...t.items, { titulo, detalle }] } : t
+      ),
+    }));
     setTextoResena("");
   };
 
@@ -251,24 +260,12 @@ export default function PortalClientes() {
   };
 
   const sincronizarClienteAdmin = async (nombre, telefono, notas) => {
-    const { data: fila } = await supabase.from("app_data").select("data").eq("id", "main").maybeSingle();
-    const actual = fila?.data || {};
-    const clientesActuales = actual.clientes || [];
-    const idx = clientesActuales.findIndex((c) => c.clienteId === session.user.id);
-    let nuevosClientes;
-    if (idx >= 0) {
-      nuevosClientes = clientesActuales.map((c, i) => (i === idx ? { ...c, nombre, telefono, notas } : c));
-    } else {
-      nuevosClientes = [
-        ...clientesActuales,
-        { id: Math.random().toString(36).slice(2, 9), clienteId: session.user.id, nombre, telefono, notas },
-      ];
-    }
-    await supabase.from("app_data").upsert({
-      id: "main",
-      data: { ...actual, clientes: nuevosClientes },
-      updated_at: new Date().toISOString(),
+    const { error } = await supabase.rpc("sincronizar_cliente_perfil", {
+      p_nombre: nombre,
+      p_telefono: telefono,
+      p_notas: notas,
     });
+    if (error) console.error("No se pudo sincronizar el perfil:", error);
   };
 
   const guardarPerfil = async () => {
@@ -302,43 +299,21 @@ Si falta la hora, usa "10:00". Si falta la fecha, usa el próximo día hábil.`;
       if (!res.ok) throw new Error(data.error || "Error de IA");
       const parsed = JSON.parse((data.text || "").replace(/```json|```/g, "").trim());
 
-      const { data: fila, error: errLectura } = await supabase
-        .from("app_data")
-        .select("data")
-        .eq("id", "main")
-        .maybeSingle();
-      if (errLectura) throw errLectura;
-
-      const actual = fila?.data || {};
-      const citasActuales = actual.citas || [];
       const nombreCliente = perfilForm.nombre || session.user.email;
       const correoCliente = session.user.email;
 
-      // Verificar disponibilidad: ¿ya hay una cita activa en esa misma fecha y hora?
-      const horarioOcupado = citasActuales.some(
-        (c) => c.fecha === parsed.fecha && c.hora === parsed.hora && c.estado !== "cancelada"
-      );
-      if (horarioOcupado) {
+      const { data: resultado, error: errAgendar } = await supabase.rpc("agendar_cita_cliente", {
+        p_cliente_nombre: nombreCliente,
+        p_servicio: parsed.servicio,
+        p_fecha: parsed.fecha,
+        p_hora: parsed.hora,
+      });
+      if (errAgendar) throw errAgendar;
+      if (!resultado?.ok) {
         setErrorCita("Ese horario ya está reservado. Por favor elige otra fecha u hora.");
         setEnviandoCita(false);
         return;
       }
-
-      const nuevaCita = {
-        id: Math.random().toString(36).slice(2, 9),
-        cliente: nombreCliente,
-        servicio: parsed.servicio,
-        fecha: parsed.fecha,
-        hora: parsed.hora,
-        precio: 0,
-        estado: "pendiente",
-      };
-      const nuevaData = { ...actual, citas: [...citasActuales, nuevaCita] };
-
-      const { error: errGuardar } = await supabase
-        .from("app_data")
-        .upsert({ id: "main", data: nuevaData, updated_at: new Date().toISOString() });
-      if (errGuardar) throw errGuardar;
 
       // Guardar también en la tabla "citas" para que el recordatorio del día anterior la encuentre
       await supabase.from("citas").insert({
