@@ -175,7 +175,37 @@ function IconBtn({ onClick, title, danger, children }) {
 }
 
 // ---------- App ----------
+const ADMIN_EMAIL = "kajaluapp@gmail.com";
+
 export default function App() {
+  const [session, setSession] = useState(null);
+  const [checkingSession, setCheckingSession] = useState(true);
+  const [loginForm, setLoginForm] = useState({ correo: "", clave: "" });
+  const [loginError, setLoginError] = useState("");
+  const [loginCargando, setLoginCargando] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      setCheckingSession(false);
+    });
+    const { data: listener } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
+    return () => listener.subscription.unsubscribe();
+  }, []);
+
+  const esAdminAutorizado = !!session && (session.user.email || "").toLowerCase() === ADMIN_EMAIL;
+
+  const iniciarSesionAdmin = async () => {
+    setLoginError(""); setLoginCargando(true);
+    const { error } = await supabase.auth.signInWithPassword({ email: loginForm.correo, password: loginForm.clave });
+    if (error) setLoginError(error.message);
+    setLoginCargando(false);
+  };
+
+  const cerrarSesionAdmin = async () => {
+    await supabase.auth.signOut();
+  };
+
   const [activeTab, setActiveTab] = useState("inicio");
 
   const [clientes, setClientes] = useState(seedClientes);
@@ -202,8 +232,9 @@ export default function App() {
   const [loaded, setLoaded] = useState(false);
   const [saveError, setSaveError] = useState(false);
 
-  // Cargar datos guardados al abrir la app (desde Supabase)
+  // Cargar datos guardados al abrir la app (desde Supabase) — solo si el admin ya inició sesión
   useEffect(() => {
+    if (!esAdminAutorizado) return;
     let cancelled = false;
     (async () => {
       try {
@@ -243,11 +274,11 @@ export default function App() {
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [esAdminAutorizado]);
 
   // Guardar automáticamente en Supabase cada vez que algo cambia
   useEffect(() => {
-    if (!loaded) return;
+    if (!loaded || !esAdminAutorizado) return;
     const data = { clientes, citas, productos, compras, gastos, ventas, tareas, notas, recordatorios, tips, plantillas, servicios, resenas, pautas, perfilesIA, sugerenciasIA, promosPendientes, publicacionesPendientes, publicacionesAprobadas, cotizaciones };
     supabase
       .from("app_data")
@@ -334,6 +365,59 @@ export default function App() {
         return { ...c, estado: "recibida" };
       })
     );
+
+  const estiloCajaLogin = {
+    fontFamily: "'Inter', sans-serif", display: "flex", flexDirection: "column", gap: 10,
+    alignItems: "center", justifyContent: "center", minHeight: 300, color: "#2A1E24", fontSize: 14,
+    maxWidth: 320, margin: "0 auto", padding: 24,
+  };
+  const estiloInputLogin = {
+    width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid #E7DAD2",
+    fontFamily: "'Inter', sans-serif", fontSize: 14,
+  };
+  const estiloBotonLogin = {
+    width: "100%", padding: 11, borderRadius: 8, border: "none", background: "#9C3D57",
+    color: "white", fontWeight: 600, cursor: "pointer", fontSize: 14,
+  };
+
+  if (checkingSession) return null;
+
+  if (!session) {
+    return (
+      <div style={estiloCajaLogin}>
+        <div style={{ fontFamily: "'Fraunces', serif", fontStyle: "italic", fontSize: 26, color: "#9C3D57" }}>Kajalu — Admin</div>
+        <p style={{ color: "#7A6870", margin: 0, textAlign: "center" }}>Inicia sesión para entrar al panel de administrador.</p>
+        {loginError && <div style={{ color: "#B8503F", fontSize: 13 }}>{loginError}</div>}
+        <input
+          style={estiloInputLogin}
+          type="email"
+          placeholder="Correo electrónico"
+          value={loginForm.correo}
+          onChange={(e) => setLoginForm({ ...loginForm, correo: e.target.value })}
+        />
+        <input
+          style={estiloInputLogin}
+          type="password"
+          placeholder="Contraseña"
+          value={loginForm.clave}
+          onChange={(e) => setLoginForm({ ...loginForm, clave: e.target.value })}
+        />
+        <button style={estiloBotonLogin} disabled={loginCargando} onClick={iniciarSesionAdmin}>
+          {loginCargando ? "Un momento…" : "Iniciar sesión"}
+        </button>
+      </div>
+    );
+  }
+
+  if (!esAdminAutorizado) {
+    return (
+      <div style={estiloCajaLogin}>
+        <div style={{ fontFamily: "'Fraunces', serif", fontStyle: "italic", fontSize: 26, color: "#9C3D57" }}>Kajalu — Admin</div>
+        <p style={{ color: "#7A6870", margin: 0, textAlign: "center" }}>Esta cuenta no tiene permiso para ver el panel de administrador.</p>
+        <button style={estiloBotonLogin} onClick={cerrarSesionAdmin}>Cerrar sesión</button>
+      </div>
+    );
+  }
 
   if (!loaded) {
     return (
@@ -560,6 +644,13 @@ export default function App() {
             }}
           >
             Restablecer datos
+          </button>
+          <button
+            className="k-btn ghost"
+            style={{ fontSize: 11.5, padding: "5px 10px" }}
+            onClick={cerrarSesionAdmin}
+          >
+            Cerrar sesión
           </button>
         </div>
       </aside>
