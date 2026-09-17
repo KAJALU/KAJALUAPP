@@ -1927,6 +1927,8 @@ function ContenidoPortal() {
   const [contenido, setContenido] = useState({ tabs: [] });
   const [cargando, setCargando] = useState(true);
   const [tabActiva, setTabActiva] = useState("");
+  const [portada, setPortada] = useState("");
+  const [subiendoPortada, setSubiendoPortada] = useState(false);
 
   const [nuevoItem, setNuevoItem] = useState({ titulo: "", detalle: "", imagenUrl: "" });
   const [subiendoImagen, setSubiendoImagen] = useState(false);
@@ -1940,9 +1942,34 @@ function ContenidoPortal() {
     const { data: fila } = await supabase.from("app_data").select("data").eq("id", "main").maybeSingle();
     const c = fila?.data?.contenido || { tabs: [] };
     setContenido(c);
+    if (fila?.data?.portada) setPortada(fila.data.portada);
     const gestionables = c.tabs.filter((t) => t.id !== "fotosvideos");
     if (gestionables.length > 0) setTabActiva(gestionables[0].id);
     setCargando(false);
+  };
+
+  const subirPortada = async (e) => {
+    const archivo = e.target.files[0];
+    if (!archivo) return;
+    setSubiendoPortada(true);
+    try {
+      const nombreArchivo = `portada_${Date.now()}_${archivo.name}`;
+      const { error } = await supabase.storage.from("kajalu-fotos").upload(nombreArchivo, archivo);
+      if (error) throw error;
+      const { data } = supabase.storage.from("kajalu-fotos").getPublicUrl(nombreArchivo);
+      const { data: fila } = await supabase.from("app_data").select("data").eq("id", "main").maybeSingle();
+      const actual = fila?.data || {};
+      await supabase.from("app_data").upsert({
+        id: "main",
+        data: { ...actual, portada: data.publicUrl },
+        updated_at: new Date().toISOString(),
+      });
+      setPortada(data.publicUrl);
+    } catch (err) {
+      alert("No se pudo subir la portada: " + err.message);
+    } finally {
+      setSubiendoPortada(false);
+    }
   };
 
   useEffect(() => { cargar(); }, []);
@@ -2023,6 +2050,16 @@ function ContenidoPortal() {
         title="Contenido del portal de clientas"
         subtitle="Administra Catálogo, Promociones, Tips, Reseñas y cualquier pestaña nueva — se refleja directo en el portal."
       />
+
+      <Card>
+        <h3>Portada del portal</h3>
+        <p style={{ fontSize: 13, color: "var(--ink-soft)", marginTop: 0 }}>
+          Es la imagen ancha que ven las clientas arriba de todo, como la portada de una página de Facebook.
+        </p>
+        {portada && <img src={portada} alt="Portada actual" style={{ width: "100%", maxWidth: 400, borderRadius: 10, marginBottom: 10 }} />}
+        <input type="file" accept="image/*" onChange={subirPortada} disabled={subiendoPortada} />
+        {subiendoPortada && <span style={{ fontSize: 12.5, color: "var(--ink-soft)", marginLeft: 8 }}>Subiendo…</span>}
+      </Card>
 
       <Card>
         <h3>Pestañas</h3>

@@ -46,6 +46,8 @@ export default function PortalClientes() {
   const [mostrandoFormPestaña, setMostrandoFormPestaña] = useState(false);
   const [textoResena, setTextoResena] = useState("");
   const [servicios, setServicios] = useState([]);
+  const [portada, setPortada] = useState("");
+  const [itemGaleriaAbierto, setItemGaleriaAbierto] = useState(null);
   // La administración del contenido (agregar/quitar pestañas, fotos, etc.) ahora se hace
   // exclusivamente desde el panel de administrador (App.jsx) — aquí el portal es solo para clientas.
   const esAdmin = false;
@@ -97,6 +99,7 @@ export default function PortalClientes() {
         setTabActiva(contenidoGuardado.tabs[0].id);
       }
       if (fila?.data?.servicios) setServicios(fila.data.servicios);
+      if (fila?.data?.portada) setPortada(fila.data.portada);
 
       const hoy = new Date().toISOString().slice(0, 10);
       const mensajeGuardado = fila?.data?.mensajeDia;
@@ -386,7 +389,8 @@ Si falta la hora, usa "10:00". Si falta la fecha, usa el próximo día hábil.`;
         .p-root {
           --bg: #FAF6F2; --surface: #FFFFFF; --ink: #2A1E24; --ink-soft: #7A6870;
           --accent: #9C3D57; --accent-soft: #F1DCE0; --line: #E7DAD2; --danger: #B8503F; --success: #4F7A5A;
-          font-family: 'Inter', sans-serif; background: var(--bg); min-height: 100vh;
+          font-family: 'Inter', sans-serif; min-height: 100vh;
+          background: linear-gradient(180deg, #FDF2ED 0%, #FAF6F2 45%, #F3E7E1 100%);
           display: flex; align-items: center; justify-content: center; padding: 24px;
         }
         .p-root * { box-sizing: border-box; }
@@ -447,6 +451,57 @@ Si falta la hora, usa "10:00". Si falta la fecha, usa el próximo día hábil.`;
           .k-main { padding: 60px 16px 24px; }
           .k-grid { grid-template-columns: 1fr; }
         }
+
+        /* --- Página completa (portada + panel) --- */
+        .k-pagina { width: 100%; max-width: 1100px; }
+        .k-portada {
+          width: 100%; height: 170px; border-radius: 14px 14px 0 0; position: relative;
+          background: linear-gradient(135deg, var(--accent), #C9718A 60%, var(--gold, #A87C25));
+          background-size: cover; background-position: center; overflow: visible;
+          box-shadow: 0 2px 24px rgba(0,0,0,0.06);
+        }
+        .k-portada-avatar {
+          position: absolute; left: 26px; bottom: -34px; width: 88px; height: 88px; border-radius: 50%;
+          background: white; border: 4px solid white; box-shadow: 0 2px 10px rgba(0,0,0,0.18);
+          display: flex; align-items: center; justify-content: center;
+          font-family: 'Fraunces', serif; font-style: italic; color: var(--accent); font-size: 18px;
+        }
+        .k-app { border-radius: 0 0 14px 14px; padding-top: 44px; }
+
+        /* --- Galería --- */
+        .k-galeria { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; }
+        .k-galeria-item {
+          position: relative; width: 100%; aspect-ratio: 1 / 1; border-radius: 10px; overflow: hidden;
+          cursor: pointer; background: var(--surface-alt, var(--bg));
+        }
+        .k-galeria-item img, .k-galeria-item video {
+          width: 100%; height: 100%; object-fit: cover; display: block;
+        }
+
+        /* --- Lightbox (vista ampliada) --- */
+        .k-lightbox {
+          position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 2000;
+          display: flex; align-items: center; justify-content: center; padding: 24px;
+        }
+        .k-lightbox-contenido {
+          background: var(--surface); border-radius: 14px; padding: 16px; max-width: 480px; width: 100%;
+          display: flex; flex-direction: column; align-items: center; gap: 10px;
+        }
+        .k-lightbox-contenido img, .k-lightbox-contenido video {
+          width: 100%; max-height: 60vh; object-fit: contain; border-radius: 8px;
+        }
+        .k-lightbox-contenido p { margin: 0; font-size: 14px; color: var(--ink); text-align: center; }
+        .k-lightbox-cerrar {
+          background: var(--accent); color: white; border: none; border-radius: 8px;
+          padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer;
+        }
+
+        @media (max-width: 760px) {
+          .k-pagina { max-width: 100%; }
+          .k-portada { border-radius: 0; height: 130px; }
+          .k-portada-avatar { width: 68px; height: 68px; left: 18px; bottom: -26px; font-size: 14px; }
+          .k-app { padding-top: 34px; }
+        }
       `}</style>
 
       {!session ? (
@@ -502,6 +557,10 @@ Si falta la hora, usa "10:00". Si falta la fecha, usa el próximo día hábil.`;
           )}
         </div>
       ) : (
+        <div className="k-pagina">
+          <div className="k-portada" style={portada ? { backgroundImage: `url(${portada})` } : {}}>
+            <div className="k-portada-avatar">Kajalu</div>
+          </div>
         <div className="k-app">
           <button className="k-menu-toggle" onClick={() => setMenuAbierto(!menuAbierto)}>
             {menuAbierto ? <X size={20} /> : <Menu size={20} />}
@@ -574,22 +633,35 @@ Si falta la hora, usa "10:00". Si falta la fecha, usa el próximo día hábil.`;
 
                 {contenido.tabs.find((t) => t.id === "fotosvideos")?.items.length > 0 && (
                   <div style={{ marginTop: 20 }}>
-                    <div className="p-title" style={{ fontSize: 16, marginBottom: 10 }}>Novedades</div>
-                    <div className="k-grid">
+                    <div className="p-title" style={{ fontSize: 16, marginBottom: 10 }}>Galería</div>
+                    <div className="k-galeria">
                       {contenido.tabs
                         .find((t) => t.id === "fotosvideos")
                         .items.slice()
                         .reverse()
                         .map((item, i) => (
-                          <div className="p-item" key={i}>
+                          <div className="k-galeria-item" key={i} onClick={() => setItemGaleriaAbierto(item)} role="button">
                             {item.tipoMedia === "video" ? (
-                              <video src={item.imagenUrl} controls className="p-item-img" />
+                              <video src={item.imagenUrl} muted />
                             ) : (
-                              <img src={item.imagenUrl} alt={item.titulo} className="p-item-img" />
+                              <img src={item.imagenUrl} alt={item.titulo} />
                             )}
-                            <div className="p-item-titulo">{item.titulo}</div>
                           </div>
                         ))}
+                    </div>
+                  </div>
+                )}
+
+                {itemGaleriaAbierto && (
+                  <div className="k-lightbox" onClick={() => setItemGaleriaAbierto(null)}>
+                    <div className="k-lightbox-contenido" onClick={(e) => e.stopPropagation()}>
+                      {itemGaleriaAbierto.tipoMedia === "video" ? (
+                        <video src={itemGaleriaAbierto.imagenUrl} controls autoPlay />
+                      ) : (
+                        <img src={itemGaleriaAbierto.imagenUrl} alt={itemGaleriaAbierto.titulo} />
+                      )}
+                      <p>{itemGaleriaAbierto.titulo}</p>
+                      <button className="k-lightbox-cerrar" onClick={() => setItemGaleriaAbierto(null)}>Cerrar</button>
                     </div>
                   </div>
                 )}
@@ -754,6 +826,7 @@ Si falta la hora, usa "10:00". Si falta la fecha, usa el próximo día hábil.`;
               </div>
             )}
           </main>
+        </div>
         </div>
       )}
 
