@@ -517,14 +517,16 @@ Si falta la hora, usa "10:00". Si falta la fecha, usa el próximo día hábil.`;
               <button className={`k-nav-item ${vista === "precios" ? "k-nav-activo" : ""}`} onClick={() => irA("precios")}>
                 <Tag size={17} /> Lista de precios
               </button>
-              {contenido.tabs.map((t) => {
-                const Icono = iconoDePestaña(t.tipo);
-                return (
-                  <button key={t.id} className={`k-nav-item ${vista === t.id ? "k-nav-activo" : ""}`} onClick={() => irA(t.id)}>
-                    <Icono size={17} /> {t.label}
-                  </button>
-                );
-              })}
+              {contenido.tabs
+                .filter((t) => t.id !== "fotosvideos")
+                .map((t) => {
+                  const Icono = iconoDePestaña(t.tipo);
+                  return (
+                    <button key={t.id} className={`k-nav-item ${vista === t.id ? "k-nav-activo" : ""}`} onClick={() => irA(t.id)}>
+                      <Icono size={17} /> {t.label}
+                    </button>
+                  );
+                })}
               <button className={`k-nav-item ${vista === "perfil" ? "k-nav-activo" : ""}`} onClick={() => irA("perfil")}>
                 <User size={17} /> Mi perfil
               </button>
@@ -546,23 +548,50 @@ Si falta la hora, usa "10:00". Si falta la fecha, usa el próximo día hábil.`;
             {mensaje && <div className="p-msg">{mensaje}</div>}
 
             {vista === "inicio" && (
-              <div className="k-grid">
-                <div className="k-card" onClick={() => irA("citas")} role="button">
-                  <div className="k-card-titulo"><Calendar size={16} /> Agenda tu cita</div>
-                  <p className="p-sub" style={{ margin: 0 }}>Escríbenos qué servicio quieres y cuándo.</p>
+              <>
+                <div className="k-grid">
+                  <div className="k-card" onClick={() => irA("citas")} role="button">
+                    <div className="k-card-titulo"><Calendar size={16} /> Agenda tu cita</div>
+                    <p className="p-sub" style={{ margin: 0 }}>Escríbenos qué servicio quieres y cuándo.</p>
+                  </div>
+                  {contenido.tabs
+                    .filter((t) => t.id !== "fotosvideos")
+                    .slice(0, 3)
+                    .map((t) => {
+                      const Icono = iconoDePestaña(t.tipo);
+                      return (
+                        <div className="k-card" key={t.id} onClick={() => irA(t.id)} role="button">
+                          <div className="k-card-titulo"><Icono size={16} /> {t.label}</div>
+                          <p className="p-sub" style={{ margin: 0 }}>
+                            {t.items.length > 0 ? t.items[t.items.length - 1].titulo : "Todavía no hay contenido aquí."}
+                          </p>
+                        </div>
+                      );
+                    })}
                 </div>
-                {contenido.tabs.slice(0, 3).map((t) => {
-                  const Icono = iconoDePestaña(t.tipo);
-                  return (
-                    <div className="k-card" key={t.id} onClick={() => irA(t.id)} role="button">
-                      <div className="k-card-titulo"><Icono size={16} /> {t.label}</div>
-                      <p className="p-sub" style={{ margin: 0 }}>
-                        {t.items.length > 0 ? t.items[t.items.length - 1].titulo : "Todavía no hay contenido aquí."}
-                      </p>
+
+                {contenido.tabs.find((t) => t.id === "fotosvideos")?.items.length > 0 && (
+                  <div style={{ marginTop: 20 }}>
+                    <div className="p-title" style={{ fontSize: 16, marginBottom: 10 }}>Novedades</div>
+                    <div className="k-grid">
+                      {contenido.tabs
+                        .find((t) => t.id === "fotosvideos")
+                        .items.slice()
+                        .reverse()
+                        .map((item, i) => (
+                          <div className="p-item" key={i}>
+                            {item.tipoMedia === "video" ? (
+                              <video src={item.imagenUrl} controls className="p-item-img" />
+                            ) : (
+                              <img src={item.imagenUrl} alt={item.titulo} className="p-item-img" />
+                            )}
+                            <div className="p-item-titulo">{item.titulo}</div>
+                          </div>
+                        ))}
                     </div>
-                  );
-                })}
-              </div>
+                  </div>
+                )}
+              </>
             )}
 
             {vista === "citas" && (
