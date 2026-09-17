@@ -4,7 +4,7 @@ import {
   Home, CalendarCheck, Users, Package, Wallet, CheckSquare, BellRing,
   MessageCircle, Sparkles, Plus, Trash2, Phone, AlertTriangle,
   TrendingUp, TrendingDown, ShoppingCart, ChevronRight, Sun,
-  Tag, Star, Megaphone, Bot, Loader2, CheckCircle2, Receipt, Copy
+  Tag, Star, Megaphone, Bot, Loader2, CheckCircle2, Receipt, Copy, Pencil
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
@@ -1240,6 +1240,9 @@ function Servicios({ servicios, setServicios }) {
   const [form, setForm] = useState({ nombre: "", categoria: "", precio: "", duracion: "" });
   const esOtro = servicioElegido === "__otro__";
 
+  const [editandoId, setEditandoId] = useState(null);
+  const [formEdicion, setFormEdicion] = useState({ nombre: "", categoria: "", precio: "", duracion: "" });
+
   const elegirDelCatalogo = (valor) => {
     setServicioElegido(valor);
     if (valor === "__otro__") {
@@ -1258,6 +1261,18 @@ function Servicios({ servicios, setServicios }) {
     setServicioElegido("");
   };
 
+  const empezarEdicion = (s) => {
+    setEditandoId(s.id);
+    setFormEdicion({ nombre: s.nombre, categoria: s.categoria || "", precio: s.precio || "", duracion: s.duracion || "" });
+  };
+
+  const guardarEdicion = (id) => {
+    setServicios((ss) => ss.map((s) => (s.id === id ? { ...s, ...formEdicion, precio: Number(formEdicion.precio) || 0 } : s)));
+    setEditandoId(null);
+  };
+
+  const cancelarEdicion = () => setEditandoId(null);
+
   const porCategoriaCatalogo = CATALOGO_REFERENCIA.reduce((acc, s) => {
     (acc[s.categoria] = acc[s.categoria] || []).push(s);
     return acc;
@@ -1271,7 +1286,7 @@ function Servicios({ servicios, setServicios }) {
 
   return (
     <div>
-      <SectionHeader icon={<Tag size={18} />} title="Servicios y precios ofrecidos" subtitle="El menú de servicios que le muestras a tus clientas. También aparece en el portal de clientas y en Cotizaciones." />
+      <SectionHeader icon={<Tag size={18} />} title="Servicios y precios ofrecidos" subtitle="El menú de servicios que le muestras a tus clientas. También aparece en el portal de clientas y en Cotizaciones. Los cambios se guardan automáticamente." />
       <Card>
         <img src="/folleto-servicios.jpg" alt="Folleto de servicios Kajalu Stetic" style={{ width: "100%", maxWidth: 340, display: "block", margin: "0 auto", borderRadius: 12 }} />
       </Card>
@@ -1301,16 +1316,28 @@ function Servicios({ servicios, setServicios }) {
       {Object.entries(porCategoria).map(([cat, lista]) => (
         <Card key={cat}>
           <h3>{cat}</h3>
-          {lista.map((s) => (
-            <div className="k-list-row" key={s.id}>
-              <div className="main">
-                <div className="title">{s.nombre}</div>
-                {s.duracion && <div className="sub">{s.duracion}</div>}
+          {lista.map((s) =>
+            editandoId === s.id ? (
+              <div className="k-form" key={s.id} style={{ borderBottom: "1px solid var(--line)", paddingBottom: 10, marginBottom: 4 }}>
+                <input value={formEdicion.nombre} onChange={(e) => setFormEdicion({ ...formEdicion, nombre: e.target.value })} placeholder="Nombre" />
+                <input value={formEdicion.categoria} onChange={(e) => setFormEdicion({ ...formEdicion, categoria: e.target.value })} placeholder="Categoría" />
+                <input type="number" value={formEdicion.precio} onChange={(e) => setFormEdicion({ ...formEdicion, precio: e.target.value })} placeholder="Precio" style={{ maxWidth: 110 }} />
+                <input value={formEdicion.duracion} onChange={(e) => setFormEdicion({ ...formEdicion, duracion: e.target.value })} placeholder="Duración" style={{ maxWidth: 130 }} />
+                <button className="k-btn" onClick={() => guardarEdicion(s.id)}><CheckCircle2 size={14} />Guardar</button>
+                <button className="k-btn ghost" onClick={cancelarEdicion}>Cancelar</button>
               </div>
-              <div style={{ fontWeight: 600 }}>{money(s.precio)}</div>
-              <IconBtn danger onClick={() => setServicios((ss) => ss.filter((x) => x.id !== s.id))}><Trash2 size={14} /></IconBtn>
-            </div>
-          ))}
+            ) : (
+              <div className="k-list-row" key={s.id}>
+                <div className="main">
+                  <div className="title">{s.nombre}</div>
+                  {s.duracion && <div className="sub">{s.duracion}</div>}
+                </div>
+                <div style={{ fontWeight: 600 }}>{money(s.precio)}</div>
+                <IconBtn onClick={() => empezarEdicion(s)} title="Editar"><Pencil size={14} /></IconBtn>
+                <IconBtn danger onClick={() => setServicios((ss) => ss.filter((x) => x.id !== s.id))} title="Eliminar"><Trash2 size={14} /></IconBtn>
+              </div>
+            )
+          )}
         </Card>
       ))}
     </div>
