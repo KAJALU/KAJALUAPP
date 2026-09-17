@@ -4,7 +4,7 @@ import {
   Home, CalendarCheck, Users, Package, Wallet, CheckSquare, BellRing,
   MessageCircle, Sparkles, Plus, Trash2, Phone, AlertTriangle,
   TrendingUp, TrendingDown, ShoppingCart, ChevronRight, Sun,
-  Tag, Star, Megaphone, Bot, Loader2, CheckCircle2, Receipt, Copy, Pencil, Share2, Image as ImageIcon, Upload
+  Tag, Star, Megaphone, Bot, Loader2, CheckCircle2, Receipt, Copy, Pencil, Share2, Image as ImageIcon, Upload, Layers
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
@@ -321,6 +321,7 @@ export default function App() {
     { id: "servicios", label: "Servicios y precios", icon: <Tag size={18} /> },
     { id: "cotizaciones", label: "Cotizaciones", icon: <Receipt size={18} /> },
     { id: "fotosvideos", label: "Fotos y Videos", icon: <ImageIcon size={18} /> },
+    { id: "contenido", label: "Contenido del portal", icon: <Layers size={18} /> },
     { id: "catalogo", label: "Catálogo", icon: <Package size={18} /> },
     { id: "finanzas", label: "Finanzas", icon: <Wallet size={18} /> },
     { id: "resenas", label: "Reseñas", icon: <Star size={18} /> },
@@ -720,6 +721,7 @@ export default function App() {
           <Cotizaciones servicios={servicios} setServicios={setServicios} clientes={clientes} cotizaciones={cotizaciones} setCotizaciones={setCotizaciones} />
         )}
         {activeTab === "fotosvideos" && <FotosVideos />}
+        {activeTab === "contenido" && <ContenidoPortal />}
         {activeTab === "catalogo" && (
           <Catalogo
             productos={productos}
@@ -1916,6 +1918,187 @@ function FotosVideos() {
           ))}
         </div>
       </Card>
+    </div>
+  );
+}
+
+// ---------- Contenido del portal (Catálogo, Promociones, Tips, Reseñas, y pestañas nuevas) ----------
+function ContenidoPortal() {
+  const [contenido, setContenido] = useState({ tabs: [] });
+  const [cargando, setCargando] = useState(true);
+  const [tabActiva, setTabActiva] = useState("");
+
+  const [nuevoItem, setNuevoItem] = useState({ titulo: "", detalle: "", imagenUrl: "" });
+  const [subiendoImagen, setSubiendoImagen] = useState(false);
+
+  const [nuevaPestañaNombre, setNuevaPestañaNombre] = useState("");
+  const [nuevaPestañaTipo, setNuevaPestañaTipo] = useState("info");
+  const [mostrandoFormPestaña, setMostrandoFormPestaña] = useState(false);
+
+  const cargar = async () => {
+    setCargando(true);
+    const { data: fila } = await supabase.from("app_data").select("data").eq("id", "main").maybeSingle();
+    const c = fila?.data?.contenido || { tabs: [] };
+    setContenido(c);
+    const gestionables = c.tabs.filter((t) => t.id !== "fotosvideos");
+    if (gestionables.length > 0) setTabActiva(gestionables[0].id);
+    setCargando(false);
+  };
+
+  useEffect(() => { cargar(); }, []);
+
+  const guardarContenido = async (nuevoContenido) => {
+    const { data: fila } = await supabase.from("app_data").select("data").eq("id", "main").maybeSingle();
+    const actual = fila?.data || {};
+    await supabase.from("app_data").upsert({
+      id: "main",
+      data: { ...actual, contenido: nuevoContenido },
+      updated_at: new Date().toISOString(),
+    });
+    setContenido(nuevoContenido);
+  };
+
+  const tabsGestionables = contenido.tabs.filter((t) => t.id !== "fotosvideos");
+  const tabActual = contenido.tabs.find((t) => t.id === tabActiva);
+
+  const agregarPestaña = async () => {
+    if (!nuevaPestañaNombre.trim()) return;
+    const id = nuevaPestañaNombre.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9\-]/g, "");
+    const nuevaTab = { id, label: nuevaPestañaNombre.trim(), tipo: nuevaPestañaTipo, items: [] };
+    const nuevoContenido = { ...contenido, tabs: [...contenido.tabs, nuevaTab] };
+    await guardarContenido(nuevoContenido);
+    setTabActiva(id);
+    setNuevaPestañaNombre("");
+    setNuevaPestañaTipo("info");
+    setMostrandoFormPestaña(false);
+  };
+
+  const eliminarPestaña = async (id) => {
+    const nuevasTabs = contenido.tabs.filter((t) => t.id !== id);
+    const nuevoContenido = { ...contenido, tabs: nuevasTabs };
+    await guardarContenido(nuevoContenido);
+    const restantes = nuevasTabs.filter((t) => t.id !== "fotosvideos");
+    if (tabActiva === id) setTabActiva(restantes.length > 0 ? restantes[0].id : "");
+  };
+
+  const subirImagen = async (e) => {
+    const archivo = e.target.files[0];
+    if (!archivo) return;
+    setSubiendoImagen(true);
+    try {
+      const nombreArchivo = `${Date.now()}_${archivo.name}`;
+      const { error } = await supabase.storage.from("kajalu-fotos").upload(nombreArchivo, archivo);
+      if (error) throw error;
+      const { data } = supabase.storage.from("kajalu-fotos").getPublicUrl(nombreArchivo);
+      setNuevoItem((prev) => ({ ...prev, imagenUrl: data.publicUrl }));
+    } catch (err) {
+      alert("No se pudo subir la foto: " + err.message);
+    } finally {
+      setSubiendoImagen(false);
+    }
+  };
+
+  const agregarItem = async () => {
+    if (!nuevoItem.titulo.trim()) return;
+    const nuevasTabs = contenido.tabs.map((t) =>
+      t.id === tabActiva ? { ...t, items: [...t.items, { ...nuevoItem }] } : t
+    );
+    await guardarContenido({ ...contenido, tabs: nuevasTabs });
+    setNuevoItem({ titulo: "", detalle: "", imagenUrl: "" });
+  };
+
+  const eliminarItem = async (index) => {
+    const nuevasTabs = contenido.tabs.map((t) =>
+      t.id === tabActiva ? { ...t, items: t.items.filter((_, i) => i !== index) } : t
+    );
+    await guardarContenido({ ...contenido, tabs: nuevasTabs });
+  };
+
+  if (cargando) return <EmptyState text="Cargando…" />;
+
+  return (
+    <div>
+      <SectionHeader
+        icon={<Layers size={18} />}
+        title="Contenido del portal de clientas"
+        subtitle="Administra Catálogo, Promociones, Tips, Reseñas y cualquier pestaña nueva — se refleja directo en el portal."
+      />
+
+      <Card>
+        <h3>Pestañas</h3>
+        <div className="k-form" style={{ marginBottom: 10 }}>
+          {tabsGestionables.map((t) => (
+            <button
+              key={t.id}
+              className={t.id === tabActiva ? "k-btn" : "k-btn ghost"}
+              style={{ fontSize: 12.5, padding: "6px 12px" }}
+              onClick={() => setTabActiva(t.id)}
+            >
+              {t.label}
+            </button>
+          ))}
+          <button className="k-btn ghost" style={{ fontSize: 12.5, padding: "6px 12px" }} onClick={() => setMostrandoFormPestaña(!mostrandoFormPestaña)}>
+            <Plus size={13} />Nueva pestaña
+          </button>
+        </div>
+
+        {mostrandoFormPestaña && (
+          <div className="k-form">
+            <input placeholder="Nombre (ej: Videos)" value={nuevaPestañaNombre} onChange={(e) => setNuevaPestañaNombre(e.target.value)} />
+            <select value={nuevaPestañaTipo} onChange={(e) => setNuevaPestañaTipo(e.target.value)}>
+              <option value="info">Normal (solo tú agregas contenido)</option>
+              <option value="catalogo">Catálogo (con botón "Quiero comprarlo")</option>
+              <option value="resenas">Reseñas (las clientas pueden escribir)</option>
+            </select>
+            <button className="k-btn" onClick={agregarPestaña}><Plus size={14} />Crear</button>
+          </div>
+        )}
+
+        {tabsGestionables.length === 0 && <EmptyState text="Aún no hay pestañas. Crea la primera arriba." />}
+      </Card>
+
+      {tabActual && (
+        <>
+          <Card>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <h3 style={{ marginBottom: 0 }}>{tabActual.label}</h3>
+              <IconBtn danger onClick={() => eliminarPestaña(tabActual.id)} title="Eliminar esta pestaña"><Trash2 size={14} /></IconBtn>
+            </div>
+          </Card>
+
+          <Card>
+            <h3>Contenido</h3>
+            {tabActual.items.length === 0 && <EmptyState text="Todavía no hay contenido aquí." />}
+            <div className="k-grid cols-2">
+              {tabActual.items.map((item, i) => (
+                <div className="k-tipcard" key={i} style={{ position: "relative" }}>
+                  {item.imagenUrl && <img src={item.imagenUrl} alt={item.titulo} style={{ width: "100%", borderRadius: 8, marginBottom: 8 }} />}
+                  <h4 style={{ marginBottom: 2 }}>{item.titulo}</h4>
+                  {item.detalle && <p>{item.detalle}</p>}
+                  <div style={{ position: "absolute", top: 10, right: 10 }}>
+                    <IconBtn danger onClick={() => eliminarItem(i)} title="Eliminar"><Trash2 size={14} /></IconBtn>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          <Card>
+            <h3>Agregar a "{tabActual.label}"</h3>
+            <div className="k-form">
+              <input placeholder="Título (ej: Manicure spa — $35.000)" value={nuevoItem.titulo} onChange={(e) => setNuevoItem({ ...nuevoItem, titulo: e.target.value })} />
+              <input placeholder="Detalle (opcional)" value={nuevoItem.detalle} onChange={(e) => setNuevoItem({ ...nuevoItem, detalle: e.target.value })} />
+            </div>
+            <div className="k-form" style={{ marginTop: 8 }}>
+              <input type="file" accept="image/*" onChange={subirImagen} disabled={subiendoImagen} />
+              <button className="k-btn" disabled={subiendoImagen} onClick={agregarItem}>
+                {subiendoImagen ? "Subiendo…" : <><Plus size={14} />Agregar</>}
+              </button>
+            </div>
+            {nuevoItem.imagenUrl && <img src={nuevoItem.imagenUrl} alt="vista previa" style={{ width: "100%", maxWidth: 200, borderRadius: 8, marginTop: 8 }} />}
+          </Card>
+        </>
+      )}
     </div>
   );
 }
