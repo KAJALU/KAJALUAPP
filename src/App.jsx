@@ -4,7 +4,7 @@ import {
   Home, CalendarCheck, Users, Package, Wallet, CheckSquare, BellRing,
   MessageCircle, Sparkles, Plus, Trash2, Phone, AlertTriangle,
   TrendingUp, TrendingDown, ShoppingCart, ChevronRight, Sun,
-  Tag, Star, Megaphone, Bot, Loader2, CheckCircle2, Receipt, Copy, Pencil
+  Tag, Star, Megaphone, Bot, Loader2, CheckCircle2, Receipt, Copy, Pencil, Share2
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
@@ -27,6 +27,20 @@ const monthLabel = (key) => {
   return `${names[parseInt(m, 10) - 1]} ${y.slice(2)}`;
 };
 const money = (n) => "$" + Number(n || 0).toLocaleString("es-CO");
+
+// Comparte texto usando el selector nativo del celular (WhatsApp, Instagram, Facebook, etc.)
+// y si el navegador no lo soporta (como en computador), abre WhatsApp Web como respaldo.
+const compartir = async (texto) => {
+  if (navigator.share) {
+    try {
+      await navigator.share({ text: texto });
+      return;
+    } catch (e) {
+      // la persona canceló o el navegador lo rechazó: seguimos con el respaldo
+    }
+  }
+  window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, "_blank");
+};
 const STORAGE_KEY = "kajaluapp-data";
 
 // ---------- seed data ----------
@@ -1343,8 +1357,9 @@ function Tips({ tips, setTips }) {
             <div className="cat">{t.categoria || "General"}</div>
             <h4>{t.titulo}</h4>
             <p>{t.texto}</p>
-            <div style={{ position: "absolute", top: 10, right: 10 }}>
-              <IconBtn danger onClick={() => setTips((ts) => ts.filter((x) => x.id !== t.id))}><Trash2 size={14} /></IconBtn>
+            <div style={{ position: "absolute", top: 10, right: 10, display: "flex", gap: 2 }}>
+              <IconBtn onClick={() => compartir(`${t.titulo}\n\n${t.texto}`)} title="Compartir"><Share2 size={14} /></IconBtn>
+              <IconBtn danger onClick={() => setTips((ts) => ts.filter((x) => x.id !== t.id))} title="Eliminar"><Trash2 size={14} /></IconBtn>
             </div>
           </div>
         ))}
@@ -1831,8 +1846,9 @@ function Pautas({ pautas, setPautas }) {
             <div className="cat">{p.categoria || "General"}</div>
             <h4>{p.titulo}</h4>
             <p>{p.texto}</p>
-            <div style={{ position: "absolute", top: 10, right: 10 }}>
-              <IconBtn danger onClick={() => setPautas((ps) => ps.filter((x) => x.id !== p.id))}><Trash2 size={14} /></IconBtn>
+            <div style={{ position: "absolute", top: 10, right: 10, display: "flex", gap: 2 }}>
+              <IconBtn onClick={() => compartir(`${p.titulo}\n\n${p.texto}`)} title="Compartir"><Share2 size={14} /></IconBtn>
+              <IconBtn danger onClick={() => setPautas((ps) => ps.filter((x) => x.id !== p.id))} title="Eliminar"><Trash2 size={14} /></IconBtn>
             </div>
           </div>
         ))}
@@ -2100,6 +2116,7 @@ Responde ÚNICAMENTE con un JSON válido (sin texto adicional, sin backticks) co
                 <div className="sub" style={{ color: "var(--accent)" }}>{p.hashtags}</div>
               </div>
               <button className="k-btn" style={{ fontSize: 12, padding: "6px 10px" }} onClick={() => aprobarPublicacion(p)}>Aprobar</button>
+              <IconBtn onClick={() => compartir(`${p.texto}\n\n${p.hashtags || ""}`)} title="Compartir"><Share2 size={14} /></IconBtn>
               <IconBtn danger onClick={() => descartarPublicacion(p.id)} title="Descartar"><Trash2 size={14} /></IconBtn>
             </div>
           ))}
@@ -2116,6 +2133,7 @@ Responde ÚNICAMENTE con un JSON válido (sin texto adicional, sin backticks) co
                 <div className="sub" style={{ color: "var(--accent)" }}>{p.hashtags}</div>
               </div>
               <button className="k-btn ghost" style={{ fontSize: 12, padding: "6px 10px" }} onClick={() => copiarTexto(p)}>Copiar texto</button>
+              <IconBtn onClick={() => compartir(`${p.texto}\n\n${p.hashtags || ""}`)} title="Compartir"><Share2 size={14} /></IconBtn>
             </div>
           ))}
         </Card>
@@ -2131,6 +2149,7 @@ Responde ÚNICAMENTE con un JSON válido (sin texto adicional, sin backticks) co
               <div className="sub">{p.categoria} · {p.texto}</div>
             </div>
             <button className="k-btn" style={{ fontSize: 12, padding: "6px 10px" }} onClick={() => aprobarPromo(p)}>Aprobar</button>
+            <IconBtn onClick={() => compartir(`${p.titulo}\n\n${p.texto}`)} title="Compartir"><Share2 size={14} /></IconBtn>
             <IconBtn danger onClick={() => descartarPromo(p.id)} title="Descartar"><Trash2 size={14} /></IconBtn>
           </div>
         ))}
