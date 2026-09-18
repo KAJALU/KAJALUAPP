@@ -2036,6 +2036,7 @@ function CatalogoPublicitario() {
   const TAB_LABEL = "Catálogo publicitario";
 
   const canvasRef = React.useRef(null);
+  const imagenActualRef = React.useRef(null);
   const [imagenOriginal, setImagenOriginal] = useState(null); // dataURL original, para "Deshacer"
   const [imagenActual, setImagenActual] = useState(null); // dataURL con los cambios aplicados
   const [ajustes, setAjustes] = useState({ brillo: 100, contraste: 100, saturacion: 100 });
@@ -2045,6 +2046,10 @@ function CatalogoPublicitario() {
   const [urlWeb, setUrlWeb] = useState("");
   const [galeriaCollage, setGaleriaCollage] = useState([]); // imágenes candidatas para collage
   const [seleccionCollage, setSeleccionCollage] = useState([]);
+
+  const [videoPendiente, setVideoPendiente] = useState(null); // { archivo, previewUrl }
+
+  useEffect(() => { imagenActualRef.current = imagenActual; }, [imagenActual]);
 
   const [descripcion, setDescripcion] = useState("");
   const [publicando, setPublicando] = useState(false);
@@ -2067,10 +2072,15 @@ function CatalogoPublicitario() {
   const cargarDesdeArchivo = (e) => {
     const archivos = Array.from(e.target.files || []);
     archivos.forEach((archivo) => {
+      if (archivo.type.startsWith("video")) {
+        setVideoPendiente({ archivo, previewUrl: URL.createObjectURL(archivo) });
+        return;
+      }
       const lector = new FileReader();
       lector.onload = (ev) => {
         const dataUrl = ev.target.result;
-        if (!imagenActual) {
+        if (!imagenActualRef.current) {
+          imagenActualRef.current = dataUrl;
           setImagenOriginal(dataUrl);
           setImagenActual(dataUrl);
           setAjustes({ brillo: 100, contraste: 100, saturacion: 100 });
@@ -2087,7 +2097,8 @@ function CatalogoPublicitario() {
   const cargarDesdeUrl = () => {
     if (!urlWeb.trim()) return;
     const url = urlWeb.trim();
-    if (!imagenActual) {
+    if (!imagenActualRef.current) {
+      imagenActualRef.current = url;
       setImagenOriginal(url);
       setImagenActual(url);
       setAjustes({ brillo: 100, contraste: 100, saturacion: 100 });
@@ -2159,13 +2170,19 @@ function CatalogoPublicitario() {
   const rotar = () => setRotacion((r) => (r + 90) % 360);
   const voltear = () => setVolteado((v) => !v);
   const deshacer = () => {
+    imagenActualRef.current = imagenOriginal;
     setImagenActual(imagenOriginal);
     setRotacion(0);
     setVolteado(false);
     setAjustes({ brillo: 100, contraste: 100, saturacion: 100 });
   };
 
+  const primerRenderAjustes = React.useRef(true);
   React.useEffect(() => {
+    if (primerRenderAjustes.current) {
+      primerRenderAjustes.current = false;
+      return;
+    }
     if (imagenOriginal) aplicarAjustes();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rotacion, volteado]);
@@ -2234,26 +2251,37 @@ function CatalogoPublicitario() {
   };
 
   const publicar = async () => {
-    if (!imagenActual || !descripcion.trim()) {
-      setMensaje("Elige/edita una foto y escribe una descripción antes de publicar.");
+    if ((!imagenActual && !videoPendiente) || !descripcion.trim()) {
+      setMensaje("Elige/edita una foto o video, y escribe una descripción antes de publicar.");
       return;
     }
     setPublicando(true);
     setMensaje("");
     try {
-      const respuesta = await fetch(imagenActual);
-      const blob = await respuesta.blob();
-      const nombreArchivo = `${Date.now()}_catalogo.jpg`;
-      const { error: errSubida } = await supabase.storage.from("kajalu-fotos").upload(nombreArchivo, blob, { contentType: "image/jpeg" });
-      if (errSubida) throw errSubida;
-      const { data: urlData } = supabase.storage.from("kajalu-fotos").getPublicUrl(nombreArchivo);
-      const url = urlData.publicUrl;
+      let url, tipoMedia;
+      if (videoPendiente) {
+        const nombreArchivo = `${Date.now()}_${videoPendiente.archivo.name}`;
+        const { error: errSubida } = await supabase.storage.from("kajalu-fotos").upload(nombreArchivo, videoPendiente.archivo);
+        if (errSubida) throw errSubida;
+        const { data: urlData } = supabase.storage.from("kajalu-fotos").getPublicUrl(nombreArchivo);
+        url = urlData.publicUrl;
+        tipoMedia = "video";
+      } else {
+        const respuesta = await fetch(imagenActual);
+        const blob = await respuesta.blob();
+        const nombreArchivo = `${Date.now()}_catalogo.jpg`;
+        const { error: errSubida } = await supabase.storage.from("kajalu-fotos").upload(nombreArchivo, blob, { contentType: "image/jpeg" });
+        if (errSubida) throw errSubida;
+        const { data: urlData } = supabase.storage.from("kajalu-fotos").getPublicUrl(nombreArchivo);
+        url = urlData.publicUrl;
+        tipoMedia = "imagen";
+      }
 
       const { data: fila } = await supabase.from("app_data").select("data").eq("id", "main").maybeSingle();
       const actual = fila?.data || {};
       const contenidoActual = actual.contenido || { tabs: [] };
       let tabs = contenidoActual.tabs || [];
-      const nuevoItem = { titulo: descripcion.trim(), imagenUrl: url, tipoMedia: "imagen" };
+      const nuevoItem = { titulo: descripcion.trim(), imagenUrl: url, tipoMedia };
 
       const yaExiste = tabs.some((t) => t.id === TAB_ID);
       if (yaExiste) {
@@ -2271,8 +2299,10 @@ function CatalogoPublicitario() {
       compartir(`${descripcion.trim()}\n\n${url}`);
 
       setItems((prev) => [...prev, nuevoItem]);
+      imagenActualRef.current = null;
       setImagenOriginal(null);
       setImagenActual(null);
+      setVideoPendiente(null);
       setGaleriaCollage([]);
       setSeleccionCollage([]);
       setDescripcion("");
@@ -2310,15 +2340,22 @@ function CatalogoPublicitario() {
       <Card>
         <h3>1. Elige tus fotos</h3>
         <div className="k-form">
-          <input type="file" accept="image/*" multiple onChange={cargarDesdeArchivo} />
+          <input type="file" accept="image/*,video/*" multiple onChange={cargarDesdeArchivo} />
         </div>
         <div className="k-form" style={{ marginTop: 8 }}>
           <input placeholder="O pega una URL de imagen de internet" value={urlWeb} onChange={(e) => setUrlWeb(e.target.value)} style={{ flex: 1 }} />
           <button className="k-btn ghost" onClick={cargarDesdeUrl}><LinkIcon size={14} />Agregar URL</button>
         </div>
         <p style={{ fontSize: 12, color: "var(--ink-soft)", marginTop: 6 }}>
-          Puedes subir varias fotos a la vez desde tu celular o computador; la primera se abre en el editor y todas quedan disponibles abajo para el collage.
+          Puedes subir varias fotos a la vez (o un video) desde tu celular o computador; la primera foto se abre en el editor y todas quedan disponibles abajo para el collage. Los videos no tienen edición — se publican tal cual, con su descripción.
         </p>
+
+        {videoPendiente && (
+          <div style={{ marginTop: 10 }}>
+            <video src={videoPendiente.previewUrl} controls style={{ width: "100%", maxWidth: 320, borderRadius: 10 }} />
+            <button className="k-btn ghost" style={{ marginTop: 6 }} onClick={() => setVideoPendiente(null)}>Quitar video</button>
+          </div>
+        )}
       </Card>
 
       {imagenActual && (
@@ -2412,7 +2449,11 @@ function CatalogoPublicitario() {
         <div className="k-grid cols-2">
           {items.map((item, i) => (
             <div className="k-tipcard" key={i} style={{ position: "relative" }}>
-              <img src={item.imagenUrl} alt={item.titulo} style={{ width: "100%", borderRadius: 8, marginBottom: 8 }} />
+              {item.tipoMedia === "video" ? (
+                <video src={item.imagenUrl} controls style={{ width: "100%", borderRadius: 8, marginBottom: 8 }} />
+              ) : (
+                <img src={item.imagenUrl} alt={item.titulo} style={{ width: "100%", borderRadius: 8, marginBottom: 8 }} />
+              )}
               <p style={{ margin: 0 }}>{item.titulo}</p>
               <div style={{ position: "absolute", top: 10, right: 10, display: "flex", gap: 2 }}>
                 <IconBtn onClick={() => compartir(`${item.titulo}\n\n${item.imagenUrl}`)} title="Compartir"><Share2 size={14} /></IconBtn>
