@@ -2091,6 +2091,7 @@ function CatalogoPublicitario() {
   const [seleccionCollage, setSeleccionCollage] = useState([]);
 
   const [videoPendiente, setVideoPendiente] = useState(null); // { archivo, previewUrl }
+  const [antesDelCollage, setAntesDelCollage] = useState(null); // snapshot para poder deshacer el collage
 
   useEffect(() => { imagenActualRef.current = imagenActual; }, [imagenActual]);
 
@@ -2173,15 +2174,23 @@ function CatalogoPublicitario() {
       img.src = fuenteUrl;
     });
 
-  const aplicarAjustes = async () => {
+  const aplicarAjustes = async (ajustesOverride) => {
     try {
-      const filtro = `brightness(${ajustes.brillo}%) contrast(${ajustes.contraste}%) saturate(${ajustes.saturacion}%)`;
+      const a = ajustesOverride || ajustes;
+      const filtro = `brightness(${a.brillo}%) contrast(${a.contraste}%) saturate(${a.saturacion}%)`;
       const resultado = await dibujarEnCanvas(imagenOriginal, { rot: rotacion, flip: volteado, filtro });
+      imagenActualRef.current = resultado;
       setImagenActual(resultado);
       setMensaje("");
     } catch (e) {
       setMensaje(e.message);
     }
+  };
+
+  const aplicarBlancoYNegro = () => {
+    const nuevosAjustes = { ...ajustes, saturacion: 0 };
+    setAjustes(nuevosAjustes);
+    aplicarAjustes(nuevosAjustes);
   };
 
   const recortarCuadrado = async () => {
@@ -2239,6 +2248,7 @@ function CatalogoPublicitario() {
       setMensaje("Elige al menos 2 fotos para armar el collage.");
       return;
     }
+    setAntesDelCollage({ imagenOriginal, imagenActual, ajustes, rotacion, volteado });
     try {
       const imgs = await Promise.all(
         seleccionCollage.slice(0, 4).map(
@@ -2282,15 +2292,28 @@ function CatalogoPublicitario() {
       }
 
       const resultado = canvas.toDataURL("image/jpeg", 0.92);
+      imagenActualRef.current = resultado;
       setImagenOriginal(resultado);
       setImagenActual(resultado);
       setRotacion(0);
       setVolteado(false);
       setAjustes({ brillo: 100, contraste: 100, saturacion: 100 });
-      setMensaje("¡Collage creado! Ahora puedes ajustarlo o publicarlo.");
+      setMensaje("¡Collage creado! Ahora puedes ajustarlo, deshacerlo o publicarlo.");
     } catch (e) {
       setMensaje(e.message);
     }
+  };
+
+  const deshacerCollage = () => {
+    if (!antesDelCollage) return;
+    imagenActualRef.current = antesDelCollage.imagenActual;
+    setImagenOriginal(antesDelCollage.imagenOriginal);
+    setImagenActual(antesDelCollage.imagenActual);
+    setAjustes(antesDelCollage.ajustes);
+    setRotacion(antesDelCollage.rotacion);
+    setVolteado(antesDelCollage.volteado);
+    setAntesDelCollage(null);
+    setMensaje("");
   };
 
   const publicar = async () => {
@@ -2408,13 +2431,19 @@ function CatalogoPublicitario() {
             <img
               src={imagenActual}
               alt="Editando"
-              style={{ maxWidth: 260, maxHeight: 260, borderRadius: 10, border: "1px solid var(--line)", objectFit: "contain" }}
+              style={{
+                maxWidth: 260, maxHeight: 260, borderRadius: 10, border: "1px solid var(--line)", objectFit: "contain",
+                filter: `brightness(${ajustes.brillo}%) contrast(${ajustes.contraste}%) saturate(${ajustes.saturacion}%)`,
+              }}
             />
             <div style={{ flex: 1, minWidth: 220 }}>
               <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
                 <button className="k-btn ghost" onClick={rotar}><RotateCw size={14} />Rotar</button>
                 <button className="k-btn ghost" onClick={voltear}><FlipHorizontal size={14} />Voltear</button>
                 <button className="k-btn ghost" onClick={recortarCuadrado}><Crop size={14} />Recorte cuadrado</button>
+                <button className="k-btn ghost" onClick={aplicarBlancoYNegro}>
+                  Blanco y negro
+                </button>
                 <button className="k-btn ghost" onClick={deshacer}><Undo2 size={14} />Deshacer todo</button>
               </div>
 
@@ -2462,7 +2491,12 @@ function CatalogoPublicitario() {
               />
             ))}
           </div>
-          <button className="k-btn ghost" onClick={crearCollage}><Grid2x2 size={14} />Crear collage con las seleccionadas</button>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button className="k-btn ghost" onClick={crearCollage}><Grid2x2 size={14} />Crear collage con las seleccionadas</button>
+            {antesDelCollage && (
+              <button className="k-btn ghost" onClick={deshacerCollage}><Undo2 size={14} />Deshacer collage</button>
+            )}
+          </div>
         </Card>
       )}
 
