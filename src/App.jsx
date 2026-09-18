@@ -314,15 +314,24 @@ export default function App() {
     return () => { cancelled = true; };
   }, [esAdminAutorizado]);
 
-  // Guardar automáticamente en Supabase cada vez que algo cambia
+  // Guardar automáticamente en Supabase cada vez que algo cambia.
+  // IMPORTANTE: primero leemos lo que hay guardado y lo fusionamos, para no borrar
+  // cosas que maneja otra parte de la app (contenido del portal, portada, mensaje del día).
   useEffect(() => {
     if (!loaded || !esAdminAutorizado) return;
-    const data = { clientes, citas, productos, compras, gastos, ventas, tareas, notas, recordatorios, tips, plantillas, servicios, resenas, pautas, perfilesIA, sugerenciasIA, promosPendientes, publicacionesPendientes, publicacionesAprobadas, cotizaciones };
-    supabase
-      .from("app_data")
-      .upsert({ id: "main", data, updated_at: new Date().toISOString() })
-      .then(({ error }) => setSaveError(!!error));
-  }, [loaded, clientes, citas, productos, compras, gastos, ventas, tareas, notas, recordatorios, tips, plantillas, servicios, resenas, pautas, perfilesIA, sugerenciasIA, promosPendientes, publicacionesPendientes, publicacionesAprobadas, cotizaciones]);
+    (async () => {
+      const { data: fila } = await supabase.from("app_data").select("data").eq("id", "main").maybeSingle();
+      const actual = fila?.data || {};
+      const data = {
+        ...actual,
+        clientes, citas, productos, compras, gastos, ventas, tareas, notas, recordatorios, tips,
+        plantillas, servicios, resenas, pautas, perfilesIA, sugerenciasIA, promosPendientes,
+        publicacionesPendientes, publicacionesAprobadas, cotizaciones,
+      };
+      const { error } = await supabase.from("app_data").upsert({ id: "main", data, updated_at: new Date().toISOString() });
+      setSaveError(!!error);
+    })();
+  }, [loaded, esAdminAutorizado, clientes, citas, productos, compras, gastos, ventas, tareas, notas, recordatorios, tips, plantillas, servicios, resenas, pautas, perfilesIA, sugerenciasIA, promosPendientes, publicacionesPendientes, publicacionesAprobadas, cotizaciones]);
 
   const tabs = [
     { id: "inicio", label: "Inicio", icon: <Home size={18} /> },
@@ -1939,6 +1948,7 @@ function FotosVideos() {
 // ---------- Portada del portal de clientas ----------
 function PortadaPortal() {
   const [portada, setPortada] = useState("");
+  const [historial, setHistorial] = useState([]);
   const [subiendo, setSubiendo] = useState(false);
   const [cargando, setCargando] = useState(true);
 
@@ -1946,10 +1956,23 @@ function PortadaPortal() {
     setCargando(true);
     const { data: fila } = await supabase.from("app_data").select("data").eq("id", "main").maybeSingle();
     if (fila?.data?.portada) setPortada(fila.data.portada);
+    if (fila?.data?.portadaHistorial) setHistorial(fila.data.portadaHistorial);
     setCargando(false);
   };
 
   useEffect(() => { cargar(); }, []);
+
+  const guardarPortada = async (url, nuevoHistorial) => {
+    const { data: fila } = await supabase.from("app_data").select("data").eq("id", "main").maybeSingle();
+    const actual = fila?.data || {};
+    await supabase.from("app_data").upsert({
+      id: "main",
+      data: { ...actual, portada: url, portadaHistorial: nuevoHistorial },
+      updated_at: new Date().toISOString(),
+    });
+    setPortada(url);
+    setHistorial(nuevoHistorial);
+  };
 
   const subirPortada = async (e) => {
     const archivo = e.target.files[0];
@@ -1960,19 +1983,18 @@ function PortadaPortal() {
       const { error } = await supabase.storage.from("kajalu-fotos").upload(nombreArchivo, archivo);
       if (error) throw error;
       const { data } = supabase.storage.from("kajalu-fotos").getPublicUrl(nombreArchivo);
-      const { data: fila } = await supabase.from("app_data").select("data").eq("id", "main").maybeSingle();
-      const actual = fila?.data || {};
-      await supabase.from("app_data").upsert({
-        id: "main",
-        data: { ...actual, portada: data.publicUrl },
-        updated_at: new Date().toISOString(),
-      });
-      setPortada(data.publicUrl);
+      const nuevoHistorial = [data.publicUrl, ...historial.filter((u) => u !== data.publicUrl)].slice(0, 12);
+      await guardarPortada(data.publicUrl, nuevoHistorial);
     } catch (err) {
       alert("No se pudo subir la portada: " + err.message);
     } finally {
       setSubiendo(false);
     }
+  };
+
+  const elegirDelHistorial = async (url) => {
+    const nuevoHistorial = [url, ...historial.filter((u) => u !== url)];
+    await guardarPortada(url, nuevoHistorial);
   };
 
   const bancosDeImagenes = [
@@ -2005,6 +2027,27 @@ function PortadaPortal() {
           Puedes elegir una foto de tu teléfono o de tu computador — el botón de arriba abre el explorador de archivos de tu dispositivo.
         </p>
       </Card>
+
+      {historial.length > 0 && (
+        <Card>
+          <h3>Portadas anteriores</h3>
+          <p style={{ fontSize: 12.5, color: "var(--ink-soft)", marginTop: 0 }}>Haz clic en una para volver a usarla, sin subirla de nuevo.</p>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {historial.map((url) => (
+              <img
+                key={url}
+                src={url}
+                alt=""
+                onClick={() => elegirDelHistorial(url)}
+                style={{
+                  width: 100, height: 60, objectFit: "cover", borderRadius: 8, cursor: "pointer",
+                  border: url === portada ? "3px solid var(--accent)" : "1px solid var(--line)",
+                }}
+              />
+            ))}
+          </div>
+        </Card>
+      )}
 
       <Card>
         <h3>¿No tienes una foto lista? Busca un fondo gratis aquí</h3>
@@ -2433,6 +2476,23 @@ function CatalogoPublicitario() {
           onChange={(e) => setDescripcion(e.target.value)}
         />
       </Card>
+
+      {(imagenActual || videoPendiente) && (
+        <Card>
+          <h3>Así se verá en el portal de clientas</h3>
+          <div style={{ maxWidth: 260, border: "1px solid var(--line)", borderRadius: 10, padding: 12, background: "var(--bg)" }}>
+            {videoPendiente ? (
+              <video src={videoPendiente.previewUrl} controls style={{ width: "100%", borderRadius: 8, marginBottom: 8 }} />
+            ) : (
+              <img src={imagenActual} alt="Vista previa" style={{ width: "100%", borderRadius: 8, marginBottom: 8 }} />
+            )}
+            <p style={{ fontWeight: 600, fontSize: 13.5, margin: "0 0 4px" }}>{descripcion || "(tu descripción aparecerá aquí)"}</p>
+            <span style={{ display: "inline-block", background: "#25D366", color: "white", fontSize: 12, fontWeight: 600, padding: "5px 10px", borderRadius: 6 }}>
+              Quiero comprarlo
+            </span>
+          </div>
+        </Card>
+      )}
 
       <Card>
         <button className="k-btn" onClick={publicar} disabled={publicando}>

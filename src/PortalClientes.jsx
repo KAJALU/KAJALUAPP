@@ -57,6 +57,12 @@ export default function PortalClientes() {
   const [menuAbierto, setMenuAbierto] = useState(false);
 
   const iconoDePestaña = (tipo) => (tipo === "catalogo" ? ShoppingBag : tipo === "resenas" ? Star : Tag);
+
+  const anunciosDestacados = contenido.tabs
+    .filter((t) => t.tipo === "catalogo")
+    .flatMap((t) => t.items.map((item) => ({ ...item, pestaña: t.label })))
+    .slice(-10)
+    .reverse();
   const irA = (v) => { setVista(v); setMenuAbierto(false); };
 
   useEffect(() => {
@@ -422,6 +428,7 @@ Si falta la hora, usa "10:00". Si falta la fecha, usa el próximo día hábil.`;
         .p-comprar { display: inline-block; margin-top: 6px; font-size: 12.5px; font-weight: 600; color: white; background: #25D366; padding: 5px 10px; border-radius: 6px; text-decoration: none; }
         .p-admin-form select { font-family: 'Inter', sans-serif; font-size: 13px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); }
         .p-item-img { width: 100%; max-height: 160px; object-fit: cover; border-radius: 8px; margin-bottom: 6px; display: block; }
+        .p-item-img-completa { width: 100%; height: auto; max-height: 380px; object-fit: contain; border-radius: 8px; margin-bottom: 6px; display: block; background: var(--bg); }
 
         /* --- Layout tipo panel para clientas con sesión iniciada --- */
         .k-app { width: 100%; max-width: 1100px; min-height: 80vh; display: flex; background: var(--bg); border-radius: 14px; overflow: hidden; box-shadow: 0 2px 24px rgba(0,0,0,0.06); }
@@ -442,14 +449,27 @@ Si falta la hora, usa "10:00". Si falta la fecha, usa el próximo día hábil.`;
         .k-card-titulo { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 14px; color: var(--ink); margin-bottom: 4px; }
         .k-panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px; margin-top: 16px; }
         .k-tab-encabezado { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+        .k-promo-panel {
+          width: 240px; flex-shrink: 0; background: linear-gradient(180deg, var(--accent-soft), var(--surface) 40%);
+          border-left: 1px solid var(--line); padding: 20px 14px; overflow-y: auto;
+          display: flex; flex-direction: column; gap: 12px;
+        }
+        .k-promo-titulo { font-family: 'Fraunces', serif; font-weight: 600; font-size: 15px; color: var(--accent); margin-bottom: 4px; }
+        .k-promo-card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .k-promo-img { width: 100%; max-height: 130px; object-fit: cover; border-radius: 8px; margin-bottom: 6px; display: block; }
+        .k-promo-texto { font-size: 12.5px; font-weight: 600; color: var(--ink); margin-bottom: 6px; }
+        .k-promo-btn { display: block; text-align: center; background: #25D366; color: white; font-size: 12px; font-weight: 600; padding: 6px 8px; border-radius: 6px; text-decoration: none; }
+
         @media (max-width: 760px) {
           .p-root { padding: 0; align-items: stretch; }
-          .k-app { border-radius: 0; min-height: 100vh; }
+          .k-app { border-radius: 0; min-height: 100vh; flex-wrap: wrap; }
           .k-menu-toggle { display: flex; position: fixed; top: 14px; left: 14px; z-index: 1000; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; width: 38px; height: 38px; align-items: center; justify-content: center; cursor: pointer; }
           .k-sidebar { position: fixed; top: 0; left: -240px; height: 100vh; z-index: 999; transition: left 0.2s ease; padding-top: 60px; }
           .k-sidebar-abierto { left: 0; }
           .k-main { padding: 60px 16px 24px; }
           .k-grid { grid-template-columns: 1fr; }
+          .k-promo-panel { width: 100%; border-left: none; border-top: 1px solid var(--line); flex-direction: row; overflow-x: auto; overflow-y: hidden; }
+          .k-promo-card { min-width: 160px; flex-shrink: 0; }
         }
 
         /* --- Página completa (portada + panel) --- */
@@ -752,9 +772,9 @@ Si falta la hora, usa "10:00". Si falta la fecha, usa el próximo día hábil.`;
                       return (
                         <div className="p-item" key={i}>
                           {item.imagenUrl && item.tipoMedia === "video" ? (
-                            <video src={item.imagenUrl} controls className="p-item-img" />
+                            <video src={item.imagenUrl} controls className="p-item-img-completa" />
                           ) : (
-                            item.imagenUrl && <img src={item.imagenUrl} alt={item.titulo} className="p-item-img" />
+                            item.imagenUrl && <img src={item.imagenUrl} alt={item.titulo} className="p-item-img-completa" />
                           )}
                           <div className="p-item-titulo">{item.titulo}</div>
                           {item.detalle && <div className="p-item-detalle">{item.detalle}</div>}
@@ -826,6 +846,28 @@ Si falta la hora, usa "10:00". Si falta la fecha, usa el próximo día hábil.`;
               </div>
             )}
           </main>
+
+          {anunciosDestacados.length > 0 && (
+            <aside className="k-promo-panel">
+              <div className="k-promo-titulo">✨ Novedades y ofertas</div>
+              {anunciosDestacados.map((item, i) => {
+                const waLink = `https://wa.me/573145390510?text=${encodeURIComponent("Hola, quiero comprar: " + item.titulo)}`;
+                return (
+                  <div className="k-promo-card" key={i}>
+                    {item.tipoMedia === "video" ? (
+                      <video src={item.imagenUrl} muted loop autoPlay playsInline className="k-promo-img" />
+                    ) : (
+                      item.imagenUrl && <img src={item.imagenUrl} alt={item.titulo} className="k-promo-img" />
+                    )}
+                    <div className="k-promo-texto">{item.titulo}</div>
+                    <a className="k-promo-btn" href={waLink} target="_blank" rel="noopener noreferrer">
+                      Quiero comprarlo
+                    </a>
+                  </div>
+                );
+              })}
+            </aside>
+          )}
         </div>
         </div>
       )}
