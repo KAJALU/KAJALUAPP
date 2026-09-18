@@ -2089,6 +2089,7 @@ function CatalogoPublicitario() {
   const [urlWeb, setUrlWeb] = useState("");
   const [galeriaCollage, setGaleriaCollage] = useState([]); // imágenes candidatas para collage
   const [seleccionCollage, setSeleccionCollage] = useState([]);
+  const [posicionesCollage, setPosicionesCollage] = useState({}); // { [url]: { x: 0-100, y: 0-100 } } — qué parte de cada foto se ve
 
   const [videoPendiente, setVideoPendiente] = useState(null); // { archivo, previewUrl }
   const [antesDelCollage, setAntesDelCollage] = useState(null); // snapshot para poder deshacer el collage
@@ -2241,6 +2242,14 @@ function CatalogoPublicitario() {
 
   const toggleSeleccionCollage = (url) => {
     setSeleccionCollage((prev) => (prev.includes(url) ? prev.filter((u) => u !== url) : [...prev, url]));
+    setPosicionesCollage((prev) => (prev[url] ? prev : { ...prev, [url]: { x: 50, y: 50 } }));
+  };
+
+  const actualizarPosicionCollage = (url, eje, valor) => {
+    setPosicionesCollage((prev) => ({
+      ...prev,
+      [url]: { ...(prev[url] || { x: 50, y: 50 }), [eje]: valor },
+    }));
   };
 
   const crearCollage = async () => {
@@ -2270,25 +2279,31 @@ function CatalogoPublicitario() {
       ctx.fillStyle = "white";
       ctx.fillRect(0, 0, tam, tam);
 
-      const dibujarCubriendo = (img, x, y, w, h) => {
+      const urlsUsadas = seleccionCollage.slice(0, 4);
+      const dibujarCubriendo = (img, x, y, w, h, foco) => {
         const escala = Math.max(w / img.width, h / img.height);
         const nw = img.width * escala;
         const nh = img.height * escala;
-        ctx.drawImage(img, x + (w - nw) / 2, y + (h - nh) / 2, nw, nh);
+        const focoX = foco?.x ?? 50;
+        const focoY = foco?.y ?? 50;
+        const offsetX = -((nw - w) * (focoX / 100));
+        const offsetY = -((nh - h) * (focoY / 100));
+        ctx.drawImage(img, x + offsetX, y + offsetY, nw, nh);
       };
+      const focoDe = (i) => posicionesCollage[urlsUsadas[i]];
 
       if (imgs.length === 2) {
-        dibujarCubriendo(imgs[0], 0, 0, tam / 2 - 2, tam);
-        dibujarCubriendo(imgs[1], tam / 2 + 2, 0, tam / 2 - 2, tam);
+        dibujarCubriendo(imgs[0], 0, 0, tam / 2 - 2, tam, focoDe(0));
+        dibujarCubriendo(imgs[1], tam / 2 + 2, 0, tam / 2 - 2, tam, focoDe(1));
       } else if (imgs.length === 3) {
-        dibujarCubriendo(imgs[0], 0, 0, tam, tam / 2 - 2);
-        dibujarCubriendo(imgs[1], 0, tam / 2 + 2, tam / 2 - 2, tam / 2 - 2);
-        dibujarCubriendo(imgs[2], tam / 2 + 2, tam / 2 + 2, tam / 2 - 2, tam / 2 - 2);
+        dibujarCubriendo(imgs[0], 0, 0, tam, tam / 2 - 2, focoDe(0));
+        dibujarCubriendo(imgs[1], 0, tam / 2 + 2, tam / 2 - 2, tam / 2 - 2, focoDe(1));
+        dibujarCubriendo(imgs[2], tam / 2 + 2, tam / 2 + 2, tam / 2 - 2, tam / 2 - 2, focoDe(2));
       } else {
-        dibujarCubriendo(imgs[0], 0, 0, tam / 2 - 2, tam / 2 - 2);
-        dibujarCubriendo(imgs[1], tam / 2 + 2, 0, tam / 2 - 2, tam / 2 - 2);
-        dibujarCubriendo(imgs[2], 0, tam / 2 + 2, tam / 2 - 2, tam / 2 - 2);
-        dibujarCubriendo(imgs[3], tam / 2 + 2, tam / 2 + 2, tam / 2 - 2, tam / 2 - 2);
+        dibujarCubriendo(imgs[0], 0, 0, tam / 2 - 2, tam / 2 - 2, focoDe(0));
+        dibujarCubriendo(imgs[1], tam / 2 + 2, 0, tam / 2 - 2, tam / 2 - 2, focoDe(1));
+        dibujarCubriendo(imgs[2], 0, tam / 2 + 2, tam / 2 - 2, tam / 2 - 2, focoDe(2));
+        dibujarCubriendo(imgs[3], tam / 2 + 2, tam / 2 + 2, tam / 2 - 2, tam / 2 - 2, focoDe(3));
       }
 
       const resultado = canvas.toDataURL("image/jpeg", 0.92);
@@ -2371,6 +2386,8 @@ function CatalogoPublicitario() {
       setVideoPendiente(null);
       setGaleriaCollage([]);
       setSeleccionCollage([]);
+      setPosicionesCollage({});
+      setAntesDelCollage(null);
       setDescripcion("");
       setMensaje("¡Publicado! Ya está visible en el portal de clientas.");
     } catch (e) {
@@ -2491,6 +2508,37 @@ function CatalogoPublicitario() {
               />
             ))}
           </div>
+
+          {seleccionCollage.length >= 2 && (
+            <div style={{ marginBottom: 10 }}>
+              <p style={{ fontSize: 12.5, color: "var(--ink-soft)", margin: "0 0 8px" }}>
+                Elige qué parte de cada foto se ve en su casilla del collage:
+              </p>
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                {seleccionCollage.slice(0, 4).map((url, i) => {
+                  const pos = posicionesCollage[url] || { x: 50, y: 50 };
+                  return (
+                    <div key={url} style={{ width: 130 }}>
+                      <img src={url} alt="" style={{ width: "100%", height: 70, objectFit: "cover", borderRadius: 6, marginBottom: 4 }} />
+                      <label style={{ fontSize: 11, color: "var(--ink-soft)" }}>Horizontal</label>
+                      <input
+                        type="range" min="0" max="100" value={pos.x}
+                        onChange={(e) => actualizarPosicionCollage(url, "x", Number(e.target.value))}
+                        style={{ width: "100%" }}
+                      />
+                      <label style={{ fontSize: 11, color: "var(--ink-soft)" }}>Vertical</label>
+                      <input
+                        type="range" min="0" max="100" value={pos.y}
+                        onChange={(e) => actualizarPosicionCollage(url, "y", Number(e.target.value))}
+                        style={{ width: "100%" }}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button className="k-btn ghost" onClick={crearCollage}><Grid2x2 size={14} />Crear collage con las seleccionadas</button>
             {antesDelCollage && (
