@@ -1794,6 +1794,9 @@ function FotosVideos() {
   const [subiendo, setSubiendo] = useState(false);
   const [mensaje, setMensaje] = useState("");
 
+  const [editandoIndex, setEditandoIndex] = useState(null);
+  const [tituloEdicion, setTituloEdicion] = useState("");
+
   const cargarItems = async () => {
     setCargandoLista(true);
     const { data: fila } = await supabase.from("app_data").select("data").eq("id", "main").maybeSingle();
@@ -1878,6 +1881,29 @@ function FotosVideos() {
     setItems((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const empezarEdicion = (index, item) => {
+    setEditandoIndex(index);
+    setTituloEdicion(item.titulo);
+  };
+
+  const guardarEdicion = async (index) => {
+    const { data: fila } = await supabase.from("app_data").select("data").eq("id", "main").maybeSingle();
+    const actual = fila?.data || {};
+    const contenidoActual = actual.contenido || { tabs: [] };
+    const tabs = (contenidoActual.tabs || []).map((t) =>
+      t.id === TAB_ID
+        ? { ...t, items: t.items.map((it, i) => (i === index ? { ...it, titulo: tituloEdicion } : it)) }
+        : t
+    );
+    await supabase.from("app_data").upsert({
+      id: "main",
+      data: { ...actual, contenido: { ...contenidoActual, tabs } },
+      updated_at: new Date().toISOString(),
+    });
+    setItems((prev) => prev.map((it, i) => (i === index ? { ...it, titulo: tituloEdicion } : it)));
+    setEditandoIndex(null);
+  };
+
   return (
     <div>
       <SectionHeader
@@ -1932,9 +1958,20 @@ function FotosVideos() {
               ) : (
                 <img src={item.imagenUrl} alt={item.titulo} style={{ width: "100%", borderRadius: 8, marginBottom: 8 }} />
               )}
-              <p style={{ margin: 0 }}>{item.titulo}</p>
+              {editandoIndex === i ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <input value={tituloEdicion} onChange={(e) => setTituloEdicion(e.target.value)} style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, padding: "6px 8px", border: "1px solid var(--line)", borderRadius: 6 }} />
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button className="k-btn" style={{ fontSize: 12, padding: "5px 10px" }} onClick={() => guardarEdicion(i)}>Guardar</button>
+                    <button className="k-btn ghost" style={{ fontSize: 12, padding: "5px 10px" }} onClick={() => setEditandoIndex(null)}>Cancelar</button>
+                  </div>
+                </div>
+              ) : (
+                <p style={{ margin: 0 }}>{item.titulo}</p>
+              )}
               <div style={{ position: "absolute", top: 10, right: 10, display: "flex", gap: 2 }}>
                 <IconBtn onClick={() => compartir(`${item.titulo}\n\n${item.imagenUrl}`)} title="Compartir"><Share2 size={14} /></IconBtn>
+                <IconBtn onClick={() => empezarEdicion(i, item)} title="Editar"><Pencil size={14} /></IconBtn>
                 <IconBtn danger onClick={() => eliminarItem(i)} title="Eliminar"><Trash2 size={14} /></IconBtn>
               </div>
             </div>
@@ -2102,6 +2139,8 @@ function CatalogoPublicitario() {
 
   const [items, setItems] = useState([]);
   const [cargandoLista, setCargandoLista] = useState(true);
+  const [editandoIndex, setEditandoIndex] = useState(null);
+  const [tituloEdicion, setTituloEdicion] = useState("");
 
   const cargarItems = async () => {
     setCargandoLista(true);
@@ -2113,6 +2152,29 @@ function CatalogoPublicitario() {
   };
 
   useEffect(() => { cargarItems(); }, []);
+
+  const empezarEdicionItem = (index, item) => {
+    setEditandoIndex(index);
+    setTituloEdicion(item.titulo);
+  };
+
+  const guardarEdicionItem = async (index) => {
+    const { data: fila } = await supabase.from("app_data").select("data").eq("id", "main").maybeSingle();
+    const actual = fila?.data || {};
+    const contenidoActual = actual.contenido || { tabs: [] };
+    const tabs = (contenidoActual.tabs || []).map((t) =>
+      t.id === TAB_ID
+        ? { ...t, items: t.items.map((it, i) => (i === index ? { ...it, titulo: tituloEdicion } : it)) }
+        : t
+    );
+    await supabase.from("app_data").upsert({
+      id: "main",
+      data: { ...actual, contenido: { ...contenidoActual, tabs } },
+      updated_at: new Date().toISOString(),
+    });
+    setItems((prev) => prev.map((it, i) => (i === index ? { ...it, titulo: tituloEdicion } : it)));
+    setEditandoIndex(null);
+  };
 
   const cargarDesdeArchivo = (e) => {
     const archivos = Array.from(e.target.files || []);
@@ -2596,9 +2658,20 @@ function CatalogoPublicitario() {
               ) : (
                 <img src={item.imagenUrl} alt={item.titulo} style={{ width: "100%", borderRadius: 8, marginBottom: 8 }} />
               )}
-              <p style={{ margin: 0 }}>{item.titulo}</p>
+              {editandoIndex === i ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <input value={tituloEdicion} onChange={(e) => setTituloEdicion(e.target.value)} style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, padding: "6px 8px", border: "1px solid var(--line)", borderRadius: 6 }} />
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button className="k-btn" style={{ fontSize: 12, padding: "5px 10px" }} onClick={() => guardarEdicionItem(i)}>Guardar</button>
+                    <button className="k-btn ghost" style={{ fontSize: 12, padding: "5px 10px" }} onClick={() => setEditandoIndex(null)}>Cancelar</button>
+                  </div>
+                </div>
+              ) : (
+                <p style={{ margin: 0 }}>{item.titulo}</p>
+              )}
               <div style={{ position: "absolute", top: 10, right: 10, display: "flex", gap: 2 }}>
                 <IconBtn onClick={() => compartir(`${item.titulo}\n\n${item.imagenUrl}`)} title="Compartir"><Share2 size={14} /></IconBtn>
+                <IconBtn onClick={() => empezarEdicionItem(i, item)} title="Editar"><Pencil size={14} /></IconBtn>
                 <IconBtn danger onClick={() => eliminarItem(i)} title="Eliminar"><Trash2 size={14} /></IconBtn>
               </div>
             </div>
@@ -2617,6 +2690,8 @@ function ContenidoPortal() {
 
   const [nuevoItem, setNuevoItem] = useState({ titulo: "", detalle: "", imagenUrl: "" });
   const [subiendoImagen, setSubiendoImagen] = useState(false);
+  const [editandoIndex, setEditandoIndex] = useState(null);
+  const [formEdicionItem, setFormEdicionItem] = useState({ titulo: "", detalle: "" });
 
   const [nuevaPestañaNombre, setNuevaPestañaNombre] = useState("");
   const [nuevaPestañaTipo, setNuevaPestañaTipo] = useState("info");
@@ -2701,6 +2776,21 @@ function ContenidoPortal() {
     await guardarContenido({ ...contenido, tabs: nuevasTabs });
   };
 
+  const empezarEdicionItem = (index, item) => {
+    setEditandoIndex(index);
+    setFormEdicionItem({ titulo: item.titulo, detalle: item.detalle || "" });
+  };
+
+  const guardarEdicionItem = async (index) => {
+    const nuevasTabs = contenido.tabs.map((t) =>
+      t.id === tabActiva
+        ? { ...t, items: t.items.map((it, i) => (i === index ? { ...it, ...formEdicionItem } : it)) }
+        : t
+    );
+    await guardarContenido({ ...contenido, tabs: nuevasTabs });
+    setEditandoIndex(null);
+  };
+
   if (cargando) return <EmptyState text="Cargando…" />;
 
   return (
@@ -2760,9 +2850,23 @@ function ContenidoPortal() {
               {tabActual.items.map((item, i) => (
                 <div className="k-tipcard" key={i} style={{ position: "relative" }}>
                   {item.imagenUrl && <img src={item.imagenUrl} alt={item.titulo} style={{ width: "100%", borderRadius: 8, marginBottom: 8 }} />}
-                  <h4 style={{ marginBottom: 2 }}>{item.titulo}</h4>
-                  {item.detalle && <p>{item.detalle}</p>}
-                  <div style={{ position: "absolute", top: 10, right: 10 }}>
+                  {editandoIndex === i ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      <input value={formEdicionItem.titulo} onChange={(e) => setFormEdicionItem({ ...formEdicionItem, titulo: e.target.value })} placeholder="Título" style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, padding: "6px 8px", border: "1px solid var(--line)", borderRadius: 6 }} />
+                      <input value={formEdicionItem.detalle} onChange={(e) => setFormEdicionItem({ ...formEdicionItem, detalle: e.target.value })} placeholder="Detalle" style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, padding: "6px 8px", border: "1px solid var(--line)", borderRadius: 6 }} />
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <button className="k-btn" style={{ fontSize: 12, padding: "5px 10px" }} onClick={() => guardarEdicionItem(i)}>Guardar</button>
+                        <button className="k-btn ghost" style={{ fontSize: 12, padding: "5px 10px" }} onClick={() => setEditandoIndex(null)}>Cancelar</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <h4 style={{ marginBottom: 2 }}>{item.titulo}</h4>
+                      {item.detalle && <p>{item.detalle}</p>}
+                    </>
+                  )}
+                  <div style={{ position: "absolute", top: 10, right: 10, display: "flex", gap: 2 }}>
+                    <IconBtn onClick={() => empezarEdicionItem(i, item)} title="Editar"><Pencil size={14} /></IconBtn>
                     <IconBtn danger onClick={() => eliminarItem(i)} title="Eliminar"><Trash2 size={14} /></IconBtn>
                   </div>
                 </div>
