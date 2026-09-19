@@ -402,6 +402,7 @@ Si falta la hora, usa "10:00". Si falta la fecha, usa el próximo día hábil.`;
           display: flex; align-items: center; justify-content: center; padding: 24px;
         }
         .p-root * { box-sizing: border-box; }
+        .p-root img, .p-root video { max-width: 100%; }
         .p-card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 32px; width: 100%; max-width: 420px; }
         .p-logo { font-family: 'Fraunces', serif; font-style: italic; font-size: 28px; color: var(--accent); margin-bottom: 4px; }
         .p-sub { color: var(--ink-soft); font-size: 13.5px; margin-bottom: 22px; }
@@ -431,6 +432,9 @@ Si falta la hora, usa "10:00". Si falta la fecha, usa el próximo día hábil.`;
         .p-admin-form select { font-family: 'Inter', sans-serif; font-size: 13px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); }
         .p-item-img { width: 100%; max-height: 160px; object-fit: cover; border-radius: 8px; margin-bottom: 6px; display: block; }
         .p-item-img-completa { width: 100%; height: auto; max-height: 380px; object-fit: contain; border-radius: 8px; margin-bottom: 6px; display: block; background: var(--bg); }
+        @media (max-width: 760px) {
+          .p-item-img-completa { max-height: 260px; }
+        }
 
         /* --- Layout tipo panel para clientas con sesión iniciada --- */
         .k-app { width: 100%; max-width: 1100px; min-height: 80vh; display: flex; background: var(--bg); border-radius: 14px; overflow: hidden; box-shadow: 0 2px 24px rgba(0,0,0,0.06); }
