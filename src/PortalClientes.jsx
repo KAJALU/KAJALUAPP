@@ -58,6 +58,7 @@ export default function PortalClientes() {
   const [menuAbierto, setMenuAbierto] = useState(false);
 
   const iconoDePestaña = (tipo) => (tipo === "catalogo" ? ShoppingBag : tipo === "resenas" ? Star : Tag);
+  const conMiniatura = (url) => (url ? `${url}#t=0.1` : url);
 
   const anunciosDestacados = contenido.tabs
     .filter((t) => t.tipo === "catalogo")
@@ -671,7 +672,7 @@ Si falta la hora, usa "10:00". Si falta la fecha, usa el próximo día hábil.`;
                         .map((item, i) => (
                           <div className="k-galeria-item" key={i} onClick={() => setItemGaleriaAbierto(item)} role="button">
                             {item.tipoMedia === "video" ? (
-                              <video src={item.imagenUrl} muted />
+                              <video src={conMiniatura(item.imagenUrl)} muted preload="metadata" />
                             ) : (
                               <img src={item.imagenUrl} alt={item.titulo} />
                             )}
@@ -685,7 +686,7 @@ Si falta la hora, usa "10:00". Si falta la fecha, usa el próximo día hábil.`;
                   <div className="k-lightbox" onClick={() => setItemGaleriaAbierto(null)}>
                     <div className="k-lightbox-contenido" onClick={(e) => e.stopPropagation()}>
                       {itemGaleriaAbierto.tipoMedia === "video" ? (
-                        <video src={itemGaleriaAbierto.imagenUrl} controls autoPlay />
+                        <video src={itemGaleriaAbierto.imagenUrl} controls autoPlay preload="metadata" />
                       ) : (
                         <img src={itemGaleriaAbierto.imagenUrl} alt={itemGaleriaAbierto.titulo} />
                       )}
@@ -822,7 +823,7 @@ Si falta la hora, usa "10:00". Si falta la fecha, usa el próximo día hábil.`;
                       return (
                         <div className="p-item" key={i}>
                           {item.imagenUrl && item.tipoMedia === "video" ? (
-                            <video src={item.imagenUrl} controls className="p-item-img-completa" />
+                            <video src={conMiniatura(item.imagenUrl)} controls preload="metadata" className="p-item-img-completa" />
                           ) : (
                             item.imagenUrl && <img src={item.imagenUrl} alt={item.titulo} className="p-item-img-completa" />
                           )}
