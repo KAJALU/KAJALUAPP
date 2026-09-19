@@ -1035,16 +1035,57 @@ function Clientes({ clientes, setClientes, citas }) {
 
 // ---------- Catálogo (productos + inventario + compras) ----------
 function Catalogo({ productos, setProductos, compras, setCompras, marcarCompra }) {
-  const [form, setForm] = useState({ nombre: "", categoria: "", precio: "", stock: "", minimo: "" });
+  const [form, setForm] = useState({ nombre: "", categoria: "", precio: "", stock: "", minimo: "", descuento: "", fotoUrl: "" });
   const [formCompra, setFormCompra] = useState({ item: "", proveedor: "", cantidad: "", costo: "" });
+  const [subiendoFoto, setSubiendoFoto] = useState(false);
+
+  const [editandoId, setEditandoId] = useState(null);
+  const [formEdicion, setFormEdicion] = useState({ nombre: "", categoria: "", precio: "", stock: "", minimo: "", descuento: "", fotoUrl: "" });
+  const [subiendoFotoEdicion, setSubiendoFotoEdicion] = useState(false);
+
+  const subirFoto = async (e, esEdicion) => {
+    const archivo = e.target.files[0];
+    if (!archivo) return;
+    esEdicion ? setSubiendoFotoEdicion(true) : setSubiendoFoto(true);
+    try {
+      const nombreArchivo = `producto_${Date.now()}_${archivo.name}`;
+      const { error } = await supabase.storage.from("kajalu-fotos").upload(nombreArchivo, archivo);
+      if (error) throw error;
+      const { data } = supabase.storage.from("kajalu-fotos").getPublicUrl(nombreArchivo);
+      if (esEdicion) setFormEdicion((f) => ({ ...f, fotoUrl: data.publicUrl }));
+      else setForm((f) => ({ ...f, fotoUrl: data.publicUrl }));
+    } catch (err) {
+      alert("No se pudo subir la foto: " + err.message);
+    } finally {
+      esEdicion ? setSubiendoFotoEdicion(false) : setSubiendoFoto(false);
+    }
+  };
 
   const addProducto = () => {
     if (!form.nombre.trim()) return;
     setProductos((ps) => [...ps, {
       id: uid(), nombre: form.nombre, categoria: form.categoria || "General",
       precio: Number(form.precio) || 0, stock: Number(form.stock) || 0, minimo: Number(form.minimo) || 1,
+      descuento: Number(form.descuento) || 0, fotoUrl: form.fotoUrl || "",
     }]);
-    setForm({ nombre: "", categoria: "", precio: "", stock: "", minimo: "" });
+    setForm({ nombre: "", categoria: "", precio: "", stock: "", minimo: "", descuento: "", fotoUrl: "" });
+  };
+
+  const empezarEdicion = (p) => {
+    setEditandoId(p.id);
+    setFormEdicion({
+      nombre: p.nombre, categoria: p.categoria || "", precio: p.precio || "", stock: p.stock || "",
+      minimo: p.minimo || "", descuento: p.descuento || "", fotoUrl: p.fotoUrl || "",
+    });
+  };
+
+  const guardarEdicion = (id) => {
+    setProductos((ps) => ps.map((p) => (p.id === id ? {
+      ...p, ...formEdicion,
+      precio: Number(formEdicion.precio) || 0, stock: Number(formEdicion.stock) || 0,
+      minimo: Number(formEdicion.minimo) || 1, descuento: Number(formEdicion.descuento) || 0,
+    } : p)));
+    setEditandoId(null);
   };
 
   const addCompra = () => {
@@ -1059,7 +1100,7 @@ function Catalogo({ productos, setProductos, compras, setCompras, marcarCompra }
 
   return (
     <div>
-      <SectionHeader icon={<Package size={18} />} title="Catálogo e inventario" subtitle="Productos ofrecidos, existencias y compras a proveedores." />
+      <SectionHeader icon={<Package size={18} />} title="Catálogo e inventario" subtitle="Productos ofrecidos, existencias y compras a proveedores. También aparecen en la pestaña 'Productos' del portal de clientas." />
 
       <Card>
         <h3>Agregar producto</h3>
@@ -1069,27 +1110,69 @@ function Catalogo({ productos, setProductos, compras, setCompras, marcarCompra }
           <input type="number" placeholder="Precio" value={form.precio} onChange={(e) => setForm({ ...form, precio: e.target.value })} style={{ maxWidth: 100 }} />
           <input type="number" placeholder="Stock" value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} style={{ maxWidth: 90 }} />
           <input type="number" placeholder="Mínimo" value={form.minimo} onChange={(e) => setForm({ ...form, minimo: e.target.value })} style={{ maxWidth: 90 }} />
+          <input type="number" placeholder="% Descuento" value={form.descuento} onChange={(e) => setForm({ ...form, descuento: e.target.value })} style={{ maxWidth: 110 }} />
+        </div>
+        <div className="k-form" style={{ marginTop: 8 }}>
+          <input type="file" accept="image/*" onChange={(e) => subirFoto(e, false)} disabled={subiendoFoto} />
+          {subiendoFoto && <span style={{ fontSize: 12.5, color: "var(--ink-soft)" }}>Subiendo…</span>}
           <button className="k-btn" onClick={addProducto}><Plus size={14} />Agregar</button>
         </div>
+        {form.fotoUrl && <img src={form.fotoUrl} alt="vista previa" style={{ width: 100, height: 100, objectFit: "cover", borderRadius: 8, marginTop: 8 }} />}
       </Card>
 
       <Card>
-        <table className="k-table">
-          <thead><tr><th>Producto</th><th>Categoría</th><th>Precio</th><th>Stock</th><th></th></tr></thead>
-          <tbody>
-            {productos.map((p) => (
-              <tr key={p.id}>
-                <td>{p.nombre}</td>
-                <td style={{ color: "var(--ink-soft)" }}>{p.categoria}</td>
-                <td>{money(p.precio)}</td>
-                <td>
-                  {p.stock} {p.stock <= p.minimo && <span className="k-badge bajo" style={{ marginLeft: 6 }}>bajo</span>}
-                </td>
-                <td><IconBtn danger onClick={() => setProductos((ps) => ps.filter((x) => x.id !== p.id))}><Trash2 size={14} /></IconBtn></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="k-grid cols-2">
+          {productos.map((p) =>
+            editandoId === p.id ? (
+              <div className="k-tipcard" key={p.id}>
+                <div className="k-form" style={{ marginBottom: 6 }}>
+                  <input value={formEdicion.nombre} onChange={(e) => setFormEdicion({ ...formEdicion, nombre: e.target.value })} placeholder="Nombre" />
+                  <input value={formEdicion.categoria} onChange={(e) => setFormEdicion({ ...formEdicion, categoria: e.target.value })} placeholder="Categoría" />
+                </div>
+                <div className="k-form" style={{ marginBottom: 6 }}>
+                  <input type="number" value={formEdicion.precio} onChange={(e) => setFormEdicion({ ...formEdicion, precio: e.target.value })} placeholder="Precio" style={{ maxWidth: 100 }} />
+                  <input type="number" value={formEdicion.stock} onChange={(e) => setFormEdicion({ ...formEdicion, stock: e.target.value })} placeholder="Stock" style={{ maxWidth: 90 }} />
+                  <input type="number" value={formEdicion.minimo} onChange={(e) => setFormEdicion({ ...formEdicion, minimo: e.target.value })} placeholder="Mínimo" style={{ maxWidth: 90 }} />
+                  <input type="number" value={formEdicion.descuento} onChange={(e) => setFormEdicion({ ...formEdicion, descuento: e.target.value })} placeholder="% Descuento" style={{ maxWidth: 110 }} />
+                </div>
+                <div className="k-form" style={{ marginBottom: 6 }}>
+                  <input type="file" accept="image/*" onChange={(e) => subirFoto(e, true)} disabled={subiendoFotoEdicion} />
+                  {subiendoFotoEdicion && <span style={{ fontSize: 12, color: "var(--ink-soft)" }}>Subiendo…</span>}
+                </div>
+                {formEdicion.fotoUrl && <img src={formEdicion.fotoUrl} alt="" style={{ width: 90, height: 90, objectFit: "cover", borderRadius: 8, marginBottom: 8 }} />}
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button className="k-btn" onClick={() => guardarEdicion(p.id)}><CheckCircle2 size={14} />Guardar</button>
+                  <button className="k-btn ghost" onClick={() => setEditandoId(null)}>Cancelar</button>
+                </div>
+              </div>
+            ) : (
+              <div className="k-tipcard" key={p.id} style={{ position: "relative" }}>
+                {p.fotoUrl && <img src={p.fotoUrl} alt={p.nombre} style={{ width: "100%", height: 120, objectFit: "cover", borderRadius: 8, marginBottom: 8 }} />}
+                <div className="cat">{p.categoria}</div>
+                <h4 style={{ marginBottom: 4 }}>{p.nombre}</h4>
+                <p style={{ margin: 0 }}>
+                  {p.descuento > 0 ? (
+                    <>
+                      <span style={{ textDecoration: "line-through", color: "var(--ink-soft)", marginRight: 6 }}>{money(p.precio)}</span>
+                      <strong style={{ color: "var(--accent)" }}>{money(Math.round(p.precio * (1 - p.descuento / 100)))}</strong>
+                      <span className="k-badge oferta" style={{ marginLeft: 6 }}>-{p.descuento}%</span>
+                    </>
+                  ) : (
+                    <strong>{money(p.precio)}</strong>
+                  )}
+                </p>
+                <p style={{ margin: "4px 0 0", fontSize: 12.5, color: "var(--ink-soft)" }}>
+                  Stock: {p.stock} {p.stock <= p.minimo && <span className="k-badge bajo" style={{ marginLeft: 4 }}>bajo</span>}
+                </p>
+                <div style={{ position: "absolute", top: 10, right: 10, display: "flex", gap: 2 }}>
+                  <IconBtn onClick={() => empezarEdicion(p)} title="Editar"><Pencil size={14} /></IconBtn>
+                  <IconBtn danger onClick={() => setProductos((ps) => ps.filter((x) => x.id !== p.id))} title="Eliminar"><Trash2 size={14} /></IconBtn>
+                </div>
+              </div>
+            )
+          )}
+        </div>
+        {productos.length === 0 && <EmptyState text="Aún no hay productos registrados." />}
       </Card>
 
       <Card>

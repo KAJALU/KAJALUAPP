@@ -46,6 +46,7 @@ export default function PortalClientes() {
   const [mostrandoFormPestaña, setMostrandoFormPestaña] = useState(false);
   const [textoResena, setTextoResena] = useState("");
   const [servicios, setServicios] = useState([]);
+  const [productos, setProductos] = useState([]);
   const [portada, setPortada] = useState("");
   const [itemGaleriaAbierto, setItemGaleriaAbierto] = useState(null);
   // La administración del contenido (agregar/quitar pestañas, fotos, etc.) ahora se hace
@@ -105,6 +106,7 @@ export default function PortalClientes() {
         setTabActiva(contenidoGuardado.tabs[0].id);
       }
       if (fila?.data?.servicios) setServicios(fila.data.servicios);
+      if (fila?.data?.productos) setProductos(fila.data.productos);
       if (fila?.data?.portada) setPortada(fila.data.portada);
 
       const hoy = new Date().toISOString().slice(0, 10);
@@ -598,6 +600,9 @@ Si falta la hora, usa "10:00". Si falta la fecha, usa el próximo día hábil.`;
               <button className={`k-nav-item ${vista === "precios" ? "k-nav-activo" : ""}`} onClick={() => irA("precios")}>
                 <Tag size={17} /> Lista de precios
               </button>
+              <button className={`k-nav-item ${vista === "productos" ? "k-nav-activo" : ""}`} onClick={() => irA("productos")}>
+                <ShoppingBag size={17} /> Productos
+              </button>
               {contenido.tabs
                 .filter((t) => t.id !== "fotosvideos")
                 .map((t) => {
@@ -734,6 +739,47 @@ Si falta la hora, usa "10:00". Si falta la fecha, usa el próximo día hábil.`;
                     ))}
                   </div>
                 ))}
+              </div>
+            )}
+
+            {vista === "productos" && (
+              <div className="k-panel">
+                <div className="p-title" style={{ fontSize: 16, marginBottom: 10 }}>Productos</div>
+                {productos.length === 0 && (
+                  <p className="p-sub" style={{ margin: 0 }}>Todavía no hay productos publicados.</p>
+                )}
+                <div className="k-grid">
+                  {productos.map((p) => {
+                    const agotado = p.stock <= 0;
+                    const precioFinal = p.descuento > 0 ? Math.round(p.precio * (1 - p.descuento / 100)) : p.precio;
+                    const waLink = `https://wa.me/573145390510?text=${encodeURIComponent("Hola, quiero comprar: " + p.nombre)}`;
+                    return (
+                      <div className="p-item" key={p.id}>
+                        {p.fotoUrl && <img src={p.fotoUrl} alt={p.nombre} className="p-item-img" />}
+                        <div className="p-item-titulo">{p.nombre}</div>
+                        <div className="p-item-detalle">
+                          {p.descuento > 0 ? (
+                            <>
+                              <span style={{ textDecoration: "line-through", marginRight: 6 }}>${Number(p.precio).toLocaleString("es-CO")}</span>
+                              <strong style={{ color: "var(--accent)" }}>${Number(precioFinal).toLocaleString("es-CO")}</strong>
+                              {" "}
+                              <span style={{ color: "var(--success)" }}>(-{p.descuento}%)</span>
+                            </>
+                          ) : (
+                            <strong>${Number(p.precio).toLocaleString("es-CO")}</strong>
+                          )}
+                        </div>
+                        {agotado ? (
+                          <span className="p-sub" style={{ display: "block", marginTop: 6 }}>Agotado por ahora</span>
+                        ) : (
+                          <a className="p-comprar" href={waLink} target="_blank" rel="noopener noreferrer">
+                            Quiero comprarlo
+                          </a>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
 
