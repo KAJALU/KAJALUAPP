@@ -476,7 +476,9 @@ Si falta la hora, usa "10:00". Si falta la fecha, usa el próximo día hábil.`;
           .k-main { padding: 60px 16px 24px; }
           .k-grid { grid-template-columns: 1fr; }
           .k-promo-panel { width: 100%; border-left: none; border-top: 1px solid var(--line); flex-direction: row; overflow-x: auto; overflow-y: hidden; }
-          .k-promo-card { min-width: 160px; flex-shrink: 0; }
+          .k-promo-card { width: 150px; min-width: 150px; max-width: 150px; flex-shrink: 0; }
+          .k-promo-img { height: 100px; max-height: 100px; }
+          .k-promo-texto { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
         }
 
         /* --- Página completa (portada + panel) --- */
