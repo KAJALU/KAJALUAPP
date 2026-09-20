@@ -1161,9 +1161,27 @@ function Catalogo({ productos, setProductos, compras, setCompras, marcarCompra }
                     <strong>{money(p.precio)}</strong>
                   )}
                 </p>
-                <p style={{ margin: "4px 0 0", fontSize: 12.5, color: "var(--ink-soft)" }}>
-                  Stock: {p.stock} {p.stock <= p.minimo && <span className="k-badge bajo" style={{ marginLeft: 4 }}>bajo</span>}
-                </p>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
+                  <button
+                    className="k-iconbtn"
+                    style={{ border: "1px solid var(--line)" }}
+                    onClick={() => setProductos((ps) => ps.map((x) => (x.id === p.id ? { ...x, stock: Math.max(0, x.stock - 1) } : x)))}
+                    title="Restar 1 al stock"
+                  >
+                    −
+                  </button>
+                  <span style={{ fontSize: 12.5, color: "var(--ink-soft)", minWidth: 70 }}>
+                    Stock: {p.stock} {p.stock <= p.minimo && <span className="k-badge bajo" style={{ marginLeft: 4 }}>bajo</span>}
+                  </span>
+                  <button
+                    className="k-iconbtn"
+                    style={{ border: "1px solid var(--line)" }}
+                    onClick={() => setProductos((ps) => ps.map((x) => (x.id === p.id ? { ...x, stock: x.stock + 1 } : x)))}
+                    title="Sumar 1 al stock"
+                  >
+                    +
+                  </button>
+                </div>
                 <div style={{ position: "absolute", top: 10, right: 10, display: "flex", gap: 2 }}>
                   <IconBtn onClick={() => empezarEdicion(p)} title="Editar"><Pencil size={14} /></IconBtn>
                   <IconBtn danger onClick={() => setProductos((ps) => ps.filter((x) => x.id !== p.id))} title="Eliminar"><Trash2 size={14} /></IconBtn>

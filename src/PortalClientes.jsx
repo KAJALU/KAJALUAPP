@@ -457,15 +457,14 @@ Si falta la hora, usa "10:00". Si falta la fecha, usa el próximo día hábil.`;
         .k-panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px; margin-top: 16px; }
         .k-tab-encabezado { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
         .k-promo-panel {
-          width: 240px; flex-shrink: 0; background: linear-gradient(180deg, var(--accent-soft), var(--surface) 40%);
-          border-left: 1px solid var(--line); padding: 20px 14px; overflow-y: auto;
-          display: flex; flex-direction: column; gap: 12px;
+          width: 130px; flex-shrink: 0; background: linear-gradient(180deg, var(--accent-soft), var(--surface) 40%);
+          border-left: 1px solid var(--line); padding: 16px 10px; overflow: hidden;
+          display: flex; flex-direction: column; gap: 10px;
         }
-        .k-promo-titulo { font-family: 'Fraunces', serif; font-weight: 600; font-size: 15px; color: var(--accent); margin-bottom: 4px; }
-        .k-promo-card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-        .k-promo-img { width: 100%; max-height: 130px; object-fit: cover; border-radius: 8px; margin-bottom: 6px; display: block; }
-        .k-promo-texto { font-size: 12.5px; font-weight: 600; color: var(--ink); margin-bottom: 6px; }
-        .k-promo-btn { display: block; text-align: center; background: #25D366; color: white; font-size: 12px; font-weight: 600; padding: 6px 8px; border-radius: 6px; text-decoration: none; }
+        .k-promo-titulo { font-family: 'Fraunces', serif; font-weight: 600; font-size: 13px; color: var(--accent); text-align: center; }
+        .k-promo-cinta { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; flex: 1; }
+        .k-promo-thumb { width: 100%; height: 70px; border-radius: 8px; overflow: hidden; cursor: pointer; flex-shrink: 0; border: 1px solid var(--line); background: var(--surface); }
+        .k-promo-thumb img, .k-promo-thumb video { width: 100%; height: 100%; object-fit: cover; display: block; }
 
         @media (max-width: 760px) {
           .p-root { padding: 0; align-items: stretch; }
@@ -475,10 +474,9 @@ Si falta la hora, usa "10:00". Si falta la fecha, usa el próximo día hábil.`;
           .k-sidebar-abierto { left: 0; }
           .k-main { padding: 60px 16px 24px; }
           .k-grid { grid-template-columns: 1fr; }
-          .k-promo-panel { width: 100%; border-left: none; border-top: 1px solid var(--line); flex-direction: row; overflow-x: auto; overflow-y: hidden; }
-          .k-promo-card { width: 150px; min-width: 150px; max-width: 150px; flex-shrink: 0; }
-          .k-promo-img { height: 100px; max-height: 100px; }
-          .k-promo-texto { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+          .k-promo-panel { width: 100%; border-left: none; border-top: 1px solid var(--line); flex-direction: column; padding: 10px 12px; }
+          .k-promo-cinta { flex-direction: row; overflow-x: auto; overflow-y: hidden; }
+          .k-promo-thumb { width: 64px; height: 64px; min-width: 64px; flex-shrink: 0; }
         }
 
         /* --- Página completa (portada + panel) --- */
@@ -693,6 +691,17 @@ Si falta la hora, usa "10:00". Si falta la fecha, usa el próximo día hábil.`;
                         <img src={itemGaleriaAbierto.imagenUrl} alt={itemGaleriaAbierto.titulo} />
                       )}
                       <p>{itemGaleriaAbierto.titulo}</p>
+                      {itemGaleriaAbierto.esCompra && (
+                        <a
+                          className="p-comprar"
+                          href={`https://wa.me/573145390510?text=${encodeURIComponent("Hola, quiero comprar: " + itemGaleriaAbierto.titulo)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ marginTop: 4 }}
+                        >
+                          Quiero comprarlo
+                        </a>
+                      )}
                       <button className="k-lightbox-cerrar" onClick={() => setItemGaleriaAbierto(null)}>Cerrar</button>
                     </div>
                   </div>
@@ -903,22 +912,22 @@ Si falta la hora, usa "10:00". Si falta la fecha, usa el próximo día hábil.`;
           {anunciosDestacados.length > 0 && (
             <aside className="k-promo-panel">
               <div className="k-promo-titulo">✨ Novedades y ofertas</div>
-              {anunciosDestacados.map((item, i) => {
-                const waLink = `https://wa.me/573145390510?text=${encodeURIComponent("Hola, quiero comprar: " + item.titulo)}`;
-                return (
-                  <div className="k-promo-card" key={i}>
+              <div className="k-promo-cinta">
+                {anunciosDestacados.map((item, i) => (
+                  <div
+                    className="k-promo-thumb"
+                    key={i}
+                    onClick={() => setItemGaleriaAbierto({ ...item, esCompra: true })}
+                    role="button"
+                  >
                     {item.tipoMedia === "video" ? (
-                      <video src={item.imagenUrl} muted loop autoPlay playsInline className="k-promo-img" />
+                      <video src={conMiniatura(item.imagenUrl)} muted preload="metadata" />
                     ) : (
-                      item.imagenUrl && <img src={item.imagenUrl} alt={item.titulo} className="k-promo-img" />
+                      item.imagenUrl && <img src={item.imagenUrl} alt={item.titulo} />
                     )}
-                    <div className="k-promo-texto">{item.titulo}</div>
-                    <a className="k-promo-btn" href={waLink} target="_blank" rel="noopener noreferrer">
-                      Quiero comprarlo
-                    </a>
                   </div>
-                );
-              })}
+                ))}
+              </div>
             </aside>
           )}
         </div>
