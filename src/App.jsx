@@ -266,6 +266,7 @@ export default function App() {
   const [publicacionesPendientes, setPublicacionesPendientes] = useState([]);
   const [publicacionesAprobadas, setPublicacionesAprobadas] = useState([]);
   const [cotizaciones, setCotizaciones] = useState([]);
+  const [ventasProductos, setVentasProductos] = useState([]);
 
   const [loaded, setLoaded] = useState(false);
   const [saveError, setSaveError] = useState(false);
@@ -304,6 +305,7 @@ export default function App() {
           if (data.publicacionesPendientes) setPublicacionesPendientes(data.publicacionesPendientes);
           if (data.publicacionesAprobadas) setPublicacionesAprobadas(data.publicacionesAprobadas);
           if (data.cotizaciones) setCotizaciones(data.cotizaciones);
+          if (data.ventasProductos) setVentasProductos(data.ventasProductos);
         }
       } catch (e) {
         // Aún no hay datos guardados: se usan los datos de ejemplo
@@ -326,12 +328,12 @@ export default function App() {
         ...actual,
         clientes, citas, productos, compras, gastos, ventas, tareas, notas, recordatorios, tips,
         plantillas, servicios, resenas, pautas, perfilesIA, sugerenciasIA, promosPendientes,
-        publicacionesPendientes, publicacionesAprobadas, cotizaciones,
+        publicacionesPendientes, publicacionesAprobadas, cotizaciones, ventasProductos,
       };
       const { error } = await supabase.from("app_data").upsert({ id: "main", data, updated_at: new Date().toISOString() });
       setSaveError(!!error);
     })();
-  }, [loaded, esAdminAutorizado, clientes, citas, productos, compras, gastos, ventas, tareas, notas, recordatorios, tips, plantillas, servicios, resenas, pautas, perfilesIA, sugerenciasIA, promosPendientes, publicacionesPendientes, publicacionesAprobadas, cotizaciones]);
+  }, [loaded, esAdminAutorizado, clientes, citas, productos, compras, gastos, ventas, tareas, notas, recordatorios, tips, plantillas, servicios, resenas, pautas, perfilesIA, sugerenciasIA, promosPendientes, publicacionesPendientes, publicacionesAprobadas, cotizaciones, ventasProductos]);
 
   const tabs = [
     { id: "inicio", label: "Inicio", icon: <Home size={18} /> },
@@ -344,6 +346,7 @@ export default function App() {
     { id: "portada", label: "Portada del portal", icon: <PanelTop size={18} /> },
     { id: "contenido", label: "Contenido del portal", icon: <Layers size={18} /> },
     { id: "catalogo", label: "Catálogo", icon: <Package size={18} /> },
+    { id: "inventario", label: "Inventario", icon: <Wallet size={18} /> },
     { id: "finanzas", label: "Finanzas", icon: <Wallet size={18} /> },
     { id: "resenas", label: "Reseñas", icon: <Star size={18} /> },
     { id: "tareas", label: "Tareas y notas", icon: <CheckSquare size={18} /> },
@@ -706,7 +709,7 @@ export default function App() {
               setTips(seedTips); setPlantillas(seedPlantillas);
               setServicios(seedServicios); setResenas(seedResenas); setPautas(seedPautas);
               setPerfilesIA([]); setSugerenciasIA([]); setPromosPendientes([]);
-              setPublicacionesPendientes([]); setPublicacionesAprobadas([]); setCotizaciones([]);
+              setPublicacionesPendientes([]); setPublicacionesAprobadas([]); setCotizaciones([]); setVentasProductos([]);
             }}
           >
             Restablecer datos
@@ -752,6 +755,15 @@ export default function App() {
             compras={compras}
             setCompras={setCompras}
             marcarCompra={marcarCompra}
+          />
+        )}
+        {activeTab === "inventario" && (
+          <Inventario
+            productos={productos}
+            setProductos={setProductos}
+            ventasProductos={ventasProductos}
+            setVentasProductos={setVentasProductos}
+            setVentas={setVentas}
           />
         )}
         {activeTab === "finanzas" && (
@@ -1035,12 +1047,12 @@ function Clientes({ clientes, setClientes, citas }) {
 
 // ---------- Catálogo (productos + inventario + compras) ----------
 function Catalogo({ productos, setProductos, compras, setCompras, marcarCompra }) {
-  const [form, setForm] = useState({ nombre: "", categoria: "", precio: "", stock: "", minimo: "", descuento: "", fotoUrl: "" });
+  const [form, setForm] = useState({ nombre: "", categoria: "", costo: "", precio: "", stock: "", minimo: "", descuento: "", fotoUrl: "" });
   const [formCompra, setFormCompra] = useState({ item: "", proveedor: "", cantidad: "", costo: "" });
   const [subiendoFoto, setSubiendoFoto] = useState(false);
 
   const [editandoId, setEditandoId] = useState(null);
-  const [formEdicion, setFormEdicion] = useState({ nombre: "", categoria: "", precio: "", stock: "", minimo: "", descuento: "", fotoUrl: "" });
+  const [formEdicion, setFormEdicion] = useState({ nombre: "", categoria: "", costo: "", precio: "", stock: "", minimo: "", descuento: "", fotoUrl: "" });
   const [subiendoFotoEdicion, setSubiendoFotoEdicion] = useState(false);
 
   const subirFoto = async (e, esEdicion) => {
@@ -1065,16 +1077,17 @@ function Catalogo({ productos, setProductos, compras, setCompras, marcarCompra }
     if (!form.nombre.trim()) return;
     setProductos((ps) => [...ps, {
       id: uid(), nombre: form.nombre, categoria: form.categoria || "General",
-      precio: Number(form.precio) || 0, stock: Number(form.stock) || 0, minimo: Number(form.minimo) || 1,
+      costo: Number(form.costo) || 0, precio: Number(form.precio) || 0,
+      stock: Number(form.stock) || 0, minimo: Number(form.minimo) || 1,
       descuento: Number(form.descuento) || 0, fotoUrl: form.fotoUrl || "",
     }]);
-    setForm({ nombre: "", categoria: "", precio: "", stock: "", minimo: "", descuento: "", fotoUrl: "" });
+    setForm({ nombre: "", categoria: "", costo: "", precio: "", stock: "", minimo: "", descuento: "", fotoUrl: "" });
   };
 
   const empezarEdicion = (p) => {
     setEditandoId(p.id);
     setFormEdicion({
-      nombre: p.nombre, categoria: p.categoria || "", precio: p.precio || "", stock: p.stock || "",
+      nombre: p.nombre, categoria: p.categoria || "", costo: p.costo || "", precio: p.precio || "", stock: p.stock || "",
       minimo: p.minimo || "", descuento: p.descuento || "", fotoUrl: p.fotoUrl || "",
     });
   };
@@ -1082,7 +1095,7 @@ function Catalogo({ productos, setProductos, compras, setCompras, marcarCompra }
   const guardarEdicion = (id) => {
     setProductos((ps) => ps.map((p) => (p.id === id ? {
       ...p, ...formEdicion,
-      precio: Number(formEdicion.precio) || 0, stock: Number(formEdicion.stock) || 0,
+      costo: Number(formEdicion.costo) || 0, precio: Number(formEdicion.precio) || 0, stock: Number(formEdicion.stock) || 0,
       minimo: Number(formEdicion.minimo) || 1, descuento: Number(formEdicion.descuento) || 0,
     } : p)));
     setEditandoId(null);
@@ -1107,7 +1120,8 @@ function Catalogo({ productos, setProductos, compras, setCompras, marcarCompra }
         <div className="k-form">
           <input placeholder="Nombre del producto" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} />
           <input placeholder="Categoría" value={form.categoria} onChange={(e) => setForm({ ...form, categoria: e.target.value })} />
-          <input type="number" placeholder="Precio" value={form.precio} onChange={(e) => setForm({ ...form, precio: e.target.value })} style={{ maxWidth: 100 }} />
+          <input type="number" placeholder="Precio inicial (costo)" value={form.costo} onChange={(e) => setForm({ ...form, costo: e.target.value })} style={{ maxWidth: 140 }} />
+          <input type="number" placeholder="Precio de venta" value={form.precio} onChange={(e) => setForm({ ...form, precio: e.target.value })} style={{ maxWidth: 130 }} />
           <input type="number" placeholder="Stock" value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} style={{ maxWidth: 90 }} />
           <input type="number" placeholder="Mínimo" value={form.minimo} onChange={(e) => setForm({ ...form, minimo: e.target.value })} style={{ maxWidth: 90 }} />
           <input type="number" placeholder="% Descuento" value={form.descuento} onChange={(e) => setForm({ ...form, descuento: e.target.value })} style={{ maxWidth: 110 }} />
@@ -1130,7 +1144,8 @@ function Catalogo({ productos, setProductos, compras, setCompras, marcarCompra }
                   <input value={formEdicion.categoria} onChange={(e) => setFormEdicion({ ...formEdicion, categoria: e.target.value })} placeholder="Categoría" />
                 </div>
                 <div className="k-form" style={{ marginBottom: 6 }}>
-                  <input type="number" value={formEdicion.precio} onChange={(e) => setFormEdicion({ ...formEdicion, precio: e.target.value })} placeholder="Precio" style={{ maxWidth: 100 }} />
+                  <input type="number" value={formEdicion.costo} onChange={(e) => setFormEdicion({ ...formEdicion, costo: e.target.value })} placeholder="Precio inicial" style={{ maxWidth: 120 }} />
+                  <input type="number" value={formEdicion.precio} onChange={(e) => setFormEdicion({ ...formEdicion, precio: e.target.value })} placeholder="Precio venta" style={{ maxWidth: 110 }} />
                   <input type="number" value={formEdicion.stock} onChange={(e) => setFormEdicion({ ...formEdicion, stock: e.target.value })} placeholder="Stock" style={{ maxWidth: 90 }} />
                   <input type="number" value={formEdicion.minimo} onChange={(e) => setFormEdicion({ ...formEdicion, minimo: e.target.value })} placeholder="Mínimo" style={{ maxWidth: 90 }} />
                   <input type="number" value={formEdicion.descuento} onChange={(e) => setFormEdicion({ ...formEdicion, descuento: e.target.value })} placeholder="% Descuento" style={{ maxWidth: 110 }} />
@@ -2778,6 +2793,166 @@ function CatalogoPublicitario() {
             </div>
           ))}
         </div>
+      </Card>
+    </div>
+  );
+}
+
+// ---------- Inventario (stock, ventas, ingresos y ganancias por producto) ----------
+function Inventario({ productos, setProductos, ventasProductos, setVentasProductos, setVentas }) {
+  const [cantidadPorProducto, setCantidadPorProducto] = useState({}); // { [productoId]: "3" }
+
+  const ventasDe = (productoId) => ventasProductos.filter((v) => v.productoId === productoId);
+
+  const registrarVenta = (p) => {
+    const cantidad = Number(cantidadPorProducto[p.id]) || 0;
+    if (cantidad <= 0) return;
+    if (cantidad > p.stock) {
+      alert(`Solo quedan ${p.stock} unidades de "${p.nombre}".`);
+      return;
+    }
+    const precioFinal = p.descuento > 0 ? Math.round(p.precio * (1 - p.descuento / 100)) : p.precio;
+    const ingreso = precioFinal * cantidad;
+    const ganancia = (precioFinal - (p.costo || 0)) * cantidad;
+
+    setProductos((ps) => ps.map((x) => (x.id === p.id ? { ...x, stock: x.stock - cantidad } : x)));
+
+    setVentasProductos((prev) => [
+      { id: uid(), productoId: p.id, productoNombre: p.nombre, cantidad, ingreso, ganancia, fecha: todayISO },
+      ...prev,
+    ]);
+
+    setVentas((vs) => [...vs, { id: uid(), concepto: `Venta: ${p.nombre} x${cantidad}`, monto: ingreso, fecha: todayISO }]);
+
+    setCantidadPorProducto((prev) => ({ ...prev, [p.id]: "" }));
+  };
+
+  const totales = productos.reduce(
+    (acc, p) => {
+      const ventasProducto = ventasDe(p.id);
+      const unidadesVendidas = ventasProducto.reduce((s, v) => s + v.cantidad, 0);
+      const ingresos = ventasProducto.reduce((s, v) => s + v.ingreso, 0);
+      const ganancias = ventasProducto.reduce((s, v) => s + v.ganancia, 0);
+      acc.unidadesVendidas += unidadesVendidas;
+      acc.ingresos += ingresos;
+      acc.ganancias += ganancias;
+      acc.valorInventario += (p.costo || 0) * p.stock;
+      return acc;
+    },
+    { unidadesVendidas: 0, ingresos: 0, ganancias: 0, valorInventario: 0 }
+  );
+
+  const stockBajo = productos.filter((p) => p.stock <= p.minimo);
+
+  return (
+    <div>
+      <SectionHeader
+        icon={<Package size={18} />}
+        title="Inventario"
+        subtitle="Stock, ventas, ingresos y ganancias de cada producto — conectado con Catálogo."
+      />
+
+      <div className="k-grid cols-3">
+        <Card style={{ marginBottom: 0 }}>
+          <div className="k-stat">
+            <span className="label">Unidades vendidas</span>
+            <div className="value">{totales.unidadesVendidas}</div>
+          </div>
+        </Card>
+        <Card style={{ marginBottom: 0 }}>
+          <div className="k-stat">
+            <span className="label">Ingresos por productos</span>
+            <div className="value">{money(totales.ingresos)}</div>
+          </div>
+        </Card>
+        <Card style={{ marginBottom: 0 }}>
+          <div className="k-stat">
+            <span className="label">Ganancia total</span>
+            <div className="value" style={{ color: "var(--success)" }}>{money(totales.ganancias)}</div>
+          </div>
+        </Card>
+      </div>
+
+      <Card style={{ marginTop: 16 }}>
+        <div className="k-stat" style={{ padding: 0 }}>
+          <span className="label">Valor del inventario en bodega (a precio de costo)</span>
+          <div className="value">{money(totales.valorInventario)}</div>
+        </div>
+      </Card>
+
+      {stockBajo.length > 0 && (
+        <Card>
+          <h3>Productos con stock bajo</h3>
+          {stockBajo.map((p) => (
+            <div className="k-list-row" key={p.id}>
+              <div className="main"><div className="title">{p.nombre}</div><div className="sub">Quedan {p.stock} · mínimo {p.minimo}</div></div>
+              <span className="k-badge bajo"><AlertTriangle size={11} style={{ marginRight: 4, verticalAlign: -1 }} />bajo</span>
+            </div>
+          ))}
+        </Card>
+      )}
+
+      <Card>
+        <h3>Detalle por producto</h3>
+        {productos.length === 0 && <EmptyState text="Agrega productos en 'Catálogo' para verlos aquí." />}
+        <table className="k-table">
+          <thead>
+            <tr>
+              <th>Producto</th><th>Stock</th><th>Precio inicial</th><th>Precio venta</th>
+              <th>Vendidos</th><th>Ingresos</th><th>Ganancia</th><th>Margen</th><th>Registrar venta</th>
+            </tr>
+          </thead>
+          <tbody>
+            {productos.map((p) => {
+              const ventasProducto = ventasDe(p.id);
+              const unidadesVendidas = ventasProducto.reduce((s, v) => s + v.cantidad, 0);
+              const ingresos = ventasProducto.reduce((s, v) => s + v.ingreso, 0);
+              const ganancia = ventasProducto.reduce((s, v) => s + v.ganancia, 0);
+              const precioFinal = p.descuento > 0 ? Math.round(p.precio * (1 - p.descuento / 100)) : p.precio;
+              const margen = precioFinal > 0 ? Math.round(((precioFinal - (p.costo || 0)) / precioFinal) * 100) : 0;
+              return (
+                <tr key={p.id}>
+                  <td>{p.nombre}</td>
+                  <td>{p.stock} {p.stock <= p.minimo && <span className="k-badge bajo" style={{ marginLeft: 4 }}>bajo</span>}</td>
+                  <td>{money(p.costo || 0)}</td>
+                  <td>{money(precioFinal)}{p.descuento > 0 && <span style={{ color: "var(--gold)", marginLeft: 4, fontSize: 11.5 }}>(-{p.descuento}%)</span>}</td>
+                  <td>{unidadesVendidas}</td>
+                  <td>{money(ingresos)}</td>
+                  <td style={{ color: "var(--success)" }}>{money(ganancia)}</td>
+                  <td>{margen}%</td>
+                  <td>
+                    <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                      <input
+                        type="number" min="1" max={p.stock} placeholder="Cant."
+                        value={cantidadPorProducto[p.id] || ""}
+                        onChange={(e) => setCantidadPorProducto({ ...cantidadPorProducto, [p.id]: e.target.value })}
+                        style={{ width: 60, fontFamily: "'Inter', sans-serif", fontSize: 12.5, padding: "5px 6px", border: "1px solid var(--line)", borderRadius: 6 }}
+                      />
+                      <button className="k-btn" style={{ fontSize: 11.5, padding: "5px 8px" }} onClick={() => registrarVenta(p)} disabled={p.stock <= 0}>
+                        Vender
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </Card>
+
+      <Card>
+        <h3>Historial de ventas por producto</h3>
+        {ventasProductos.length === 0 && <EmptyState text="Aún no has registrado ventas de productos." />}
+        {ventasProductos.map((v) => (
+          <div className="k-list-row" key={v.id}>
+            <div className="main">
+              <div className="title">{v.productoNombre} · {v.cantidad} un.</div>
+              <div className="sub">{v.fecha}</div>
+            </div>
+            <div style={{ fontWeight: 600, color: "var(--success)" }}>+{money(v.ingreso)}</div>
+            <IconBtn danger onClick={() => setVentasProductos((vs) => vs.filter((x) => x.id !== v.id))} title="Eliminar registro"><Trash2 size={14} /></IconBtn>
+          </div>
+        ))}
       </Card>
     </div>
   );
